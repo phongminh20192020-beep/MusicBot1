@@ -1,0 +1,152 @@
+server:
+  port: 2333
+  address: 0.0.0.0
+
+lavalink:
+  plugins:
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.1"
+      repository: "https://maven.lavalink.dev/releases"
+      snapshot: false
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.2.0"
+      repository: "https://maven.topi.wtf/releases"
+      snapshot: false
+
+  server:
+    password: "youshallnotpass"
+    sources:
+      youtube: false
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      http: true
+      local: false
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      distortion: true
+      rotation: true
+      channelMix: true
+      lowPass: true
+    bufferDurationMs: 400
+    frameBufferDurationMs: 2000
+    opusEncodingQuality: 10
+    resamplingQuality: LOW
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    playerUpdateInterval: 5
+    youtubeSearchEnabled: true
+    soundcloudSearchEnabled: true
+    gc-warnings: true
+
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+
+    # MUSIC client uses OAuth auth and is least likely to trigger bot checks
+    clients:
+      - MUSIC
+      - ANDROID_VR
+      - TVHTML5_SIMPLY
+      - MWEB
+      - WEBEMBEDDED
+      - WEB
+
+    # ============================================================================
+    # OAUTH CONFIGURATION - Device Code Flow
+    # ============================================================================
+    # This will trigger a device code flow on Lavalink startup.
+    #
+    # WHAT WILL HAPPEN:
+    #   1. Deploy this config (refreshToken is intentionally commented out)
+    #   2. Lavalink starts up
+    #   3. In the logs, you'll see a message like:
+    #
+    #      [YouTube-OAuth] Please open: https://www.google.com/device
+    #      [YouTube-OAuth] Enter code: ABCD-EFGH
+    #
+    #   4. Open https://www.google.com/device in YOUR browser
+    #   5. Enter the code shown in logs
+    #   6. Sign in with a BURNER Google account
+    #   7. Click "Allow" / "Yes, it's me"
+    #   8. Back in Lavalink logs, a refreshToken will appear
+    #   9. Copy that token, paste it below as refreshToken
+    #   10. Uncomment refreshToken and skipInitialization lines
+    #   11. Redeploy - done forever
+    #
+    # IMPORTANT:
+    #   - Use a BURNER Google account, NOT your main account
+    #   - The code expires in 15 minutes - complete it quickly
+    #   - If you miss it, restart Lavalink to get a new code
+    # ============================================================================
+    oauth:
+      enabled: true
+      # --- LEAVE THESE COMMENTED FOR FIRST RUN ---
+      # refreshToken: ""
+      # skipInitialization: true
+      # --- AFTER YOU GET THE TOKEN FROM LOGS, FILL IN AND REDEPLOY ---
+
+    # ============================================================================
+    # POT (Proof of Origin Token) - Additional bot protection bypass
+    # Uses VISITOR_DATA cookie from cookies.txt
+    # ============================================================================
+    pot:
+      cookiePath: "/Lavalink/cookies.txt"
+      # Alternative: use direct tokens
+      # visitorData: ""
+      # poToken: ""
+
+  lavasrc:
+    providers:
+      - "ytsearch:\"%ISRC%\""
+      - "ytsearch:%QUERY%"
+      - "scsearch:%QUERY%"
+    sources:
+      spotify: true
+      applemusic: false
+      deezer: false
+      yandexmusic: false
+      flowerytts: false
+      youtube: true
+    spotify:
+      clientId: "${SPOTIFY_CLIENT_ID}"
+      clientSecret: "${SPOTIFY_CLIENT_SECRET}"
+      countryCode: "US"
+      playlistLoadLimit: 6
+      albumLoadLimit: 6
+      resolveArtistsInSearch: true
+      localFiles: false
+
+metrics:
+  prometheus:
+    enabled: false
+    endpoint: /metrics
+
+sentry:
+  dsn: ""
+  environment: ""
+
+logging:
+  file:
+    path: ./logs/
+  level:
+    root: INFO
+    lavalink: INFO
+  request:
+    enabled: true
+    includeClientInfo: true
+    includeHeaders: false
+    includeQueryString: true
+    includePayload: true
+    maxPayloadLength: 10000
+  logback:
+    rollingpolicy:
+      max-file-size: 1GB
+      max-history: 30

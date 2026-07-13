@@ -1,0 +1,56 @@
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+#
+# =============================================================================
+# HOW TO GET FRESH COOKIES (do this when login fails):
+# =============================================================================
+# 1. Install the browser extension "Get cookies.txt LOCALLY" (Chrome/Firefox)
+# 2. Go to https://www.youtube.com and make sure you're signed in
+#    (use a BURNER account, not your main Google account)
+# 3. Click the extension -> Export cookies for this tab
+# 4. Copy EVERYTHING it gives you and paste below, replacing ALL existing content
+# 5. IMPORTANT: Make sure these cookies are present:
+#    - VISITOR_DATA
+#    - LOGIN_INFO
+#    - SID, HSID, SSID, APISID, SAPISID
+#    - __Secure-1PSID, __Secure-3PSID
+#    - __Secure-1PSIDTS, __Secure-3PSIDTS
+#
+# =============================================================================
+# REQUIRED FOR POT (Proof of Origin Token) - prevents bot checks:
+# =============================================================================
+# The youtube-plugin uses the VISITOR_DATA cookie to generate POT tokens.
+# If you don't see VISITOR_DATA in your exported cookies, try:
+#   - Clearing YouTube cookies and signing in again
+#   - Using a different browser
+#   - Visiting youtube.com while signed in, then exporting again
+#
+# Paste your real cookies below this line (replace everything below):
+# =============================================================================
+# Netscape HTTP Cookie File
+# https://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file! Do not edit.
+
+.youtube.com	TRUE	/	TRUE	1791277207	__Secure-BUCKET	CMwG
+.youtube.com	TRUE	/	TRUE	1810285208	LOGIN_INFO	AFmmF2swRQIgPS3N_cGBJDTbAvCU_WjC5n5iy_Vn1phmSlrxqIm5whsCIQCUZDsCT4eIqToQTzxCdsj3b37fobD5CJezbCCXJb7U3g:QUQ3MjNmd29IMWlGWmI4SF9ZOWZxTm1sUzVzLVZ4Yi1RZGRYYmlaTmVYRDg0UFozeUJKQnFMZzU2RmV3NzR6TmJoUlJ4b1ZhZGEzMXdPdmNwVDEwaWpsdE9jdVFLeWUtaEU4OFdYMmw1bmtFNHdMZlIxMEFKcEZzd2xNZVlkTlQyREJZYmpMdDdLdU16X3kxbFpoeFRxR3psYVBWUW1QTDJB
+.youtube.com	TRUE	/	TRUE	1816919848	PREF	f6=40000000&tz=Asia.Saigon
+.youtube.com	TRUE	/	FALSE	1816501375	SID	g.a000_QiCuVRTZKtMSLGmloUO1a6Z-Ye9JUTABO_WX_yNSfVrnSnNt_jZPNAkoKVRMURAxhywiwACgYKAa8SARUSFQHGX2Miiz_e-Q7_qmhNi0TpvQ3SXhoVAUF8yKpIPfTokZt_iotJE59GQ45d0076
+.youtube.com	TRUE	/	TRUE	1816501375	__Secure-1PSID	g.a000_QiCuVRTZKtMSLGmloUO1a6Z-Ye9JUTABO_WX_yNSfVrnSnNIJdq-uiYBT6_3P4UP4QhpgACgYKAR8SARUSFQHGX2MiL7PkYaWIcO4QaWQ2jK1dFBoVAUF8yKqc0VtRa-jzbAXHHd3JOfWL0076
+.youtube.com	TRUE	/	TRUE	1816501375	__Secure-3PSID	g.a000_QiCuVRTZKtMSLGmloUO1a6Z-Ye9JUTABO_WX_yNSfVrnSnN71Ih-TVxBI8T7YOly95PqgACgYKAWQSARUSFQHGX2MiZyMdFRFM7eQkPthz3vj6aBoVAUF8yKopqiI9Wq9gh7DHQxKGLNaT0076
+.youtube.com	TRUE	/	FALSE	1816501375	HSID	As7ZWo1cgET_ZLEm5
+.youtube.com	TRUE	/	TRUE	1816501375	SSID	AhPDVbv1wY_wtI2L5
+.youtube.com	TRUE	/	FALSE	1816501375	APISID	4TXw1lVs_jaP3mpF/AN0YQv_oeSe35nrP7
+.youtube.com	TRUE	/	TRUE	1816501375	SAPISID	5sYOaZK28_vS2_On/AS9Rd6FYdhKRujtHP
+.youtube.com	TRUE	/	TRUE	1816501375	__Secure-1PAPISID	5sYOaZK28_vS2_On/AS9Rd6FYdhKRujtHP
+.youtube.com	TRUE	/	TRUE	1816501375	__Secure-3PAPISID	5sYOaZK28_vS2_On/AS9Rd6FYdhKRujtHP
+.youtube.com	TRUE	/	TRUE	1813895851	__Secure-1PSIDTS	sidts-CjQByojQU9TyVl7Rez3Cpk5oxG7fchvxwxlpPkboNZu_f5_6noEgR8rZ1g5qHbWbtl6W0KLdEAA
+.youtube.com	TRUE	/	TRUE	1813895851	__Secure-3PSIDTS	sidts-CjQByojQU9TyVl7Rez3Cpk5oxG7fchvxwxlpPkboNZu_f5_6noEgR8rZ1g5qHbWbtl6W0KLdEAA
+.youtube.com	TRUE	/	FALSE	1813895865	SIDCC	AKEyXzW8gLxdmh2jJm_XMAKzbG-wSBCw5lZrsx1-LSkObaR_rh5bw2mioAOsDZCBUD1QmlVy
+.youtube.com	TRUE	/	TRUE	1813895865	__Secure-1PSIDCC	AKEyXzWpDTbhTcS38mzflr92Q_q6dNUt8hMrMaeQcWI7KKR0w3A3sio5ejWG_QdlGrlFq6b5
+.youtube.com	TRUE	/	TRUE	1813895865	__Secure-3PSIDCC	AKEyXzXUQJGiP28BlTY4qCTiKli-K6kMz30XiOy4dcclgI3i6jjhkF50cdGv5WORRXbmxO5C
+.youtube.com	TRUE	/	TRUE	1797911852	VISITOR_INFO1_LIVE	E2hSt4mEhUw
+.youtube.com	TRUE	/	TRUE	1797911852	VISITOR_PRIVACY_METADATA	CgJWThIEGgAgGA%3D%3D
+.youtube.com	TRUE	/	TRUE	0	YSC	s0hzNSn68P0
+.youtube.com	TRUE	/	TRUE	1797911845	__Secure-ROLLOUT_TOKEN	CIDXk6bbgNH_WhDam_nxs-CTAxiHjsrrv6GVAw%3D%3D
+.youtube.com	TRUE	/	TRUE	1797911846	__Secure-YNID	19.YT=fgGrSAGfIiS35_pWonkhul3uZpqGRrGmw2_hXP9gWJzVLSMejPTYs40dOP5RzH0LfhkUfYFJNnD7g3j8_Zzs-RvD05yk1EaUDPNm2i3vWrSRQwfyFJqILtEznwD91rYZXcuAkM7BMPXArgjdypkORDPNsVdZ0oopZsGZ5B-ukn9316QZmlUQLGjr-RwMvJzGkcvLnVjlVB11wApsbsXBgk2aza1S-QIzprUn9PaIUlI0wivZSbXsxrmz9rIbAZ1theivcNnLlBP5ribWgkjgVeKlML29d3s1ga7vf-qW6Hz2V9E3dvn2ChIt_QPlkL3-h6hY98b_K08LYxPJfWxz2Q

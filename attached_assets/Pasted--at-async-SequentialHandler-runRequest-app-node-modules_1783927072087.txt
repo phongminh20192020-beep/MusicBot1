@@ -1,0 +1,105 @@
+    at async SequentialHandler.runRequest (/app/node_modules/@discordjs/rest/dist/index.js:1163:23)
+    at async SequentialHandler.queueRequest (/app/node_modules/@discordjs/rest/dist/index.js:994:14)
+    at async _REST.request (/app/node_modules/@discordjs/rest/dist/index.js:1307:22)
+    at async InteractionWebhook.editMessage (/app/node_modules/discord.js/src/structures/Webhook.js:351:15)
+    at async ChatInputCommandInteraction.editReply (/app/node_modules/discord.js/src/structures/interfaces/InteractionResponses.js:247:17)
+    at async Object.execute (/app/src/commands/disconnect.js:31:5)
+    at async Client.<anonymous> (/app/src/index.js:409:5) {
+  requestBody: {
+    files: [],
+    json: {
+      content: 'Disconnected ✅ — saved **2** tracks to queue. Use /restore to restore.',
+      tts: false,
+      nonce: undefined,
+      enforce_nonce: false,
+      embeds: undefined,
+      components: undefined,
+      username: undefined,
+  rawError: { message: 'Invalid Webhook Token', code: 50027 },
+      avatar_url: undefined,
+  code: 50027,
+      allowed_mentions: undefined,
+  status: 401,
+      flags: undefined,
+  method: 'PATCH',
+      message_reference: undefined,
+  url: 'https://discord.com/api/v10/webhooks/1517842487023239230/aW50ZXJhY3Rpb246MTUyNjA5OTQ0MTYwNDM2NjQzNjpYUmt2RktTbTAxOWhsNVM4S2EwdjVwOVMxcWY5U0dpMzg5ZmV3RkJ1b1NuNTNFcUFBQjVTdU05T29COVlWbklFZG4xMXpPYVBqaFVsaGJyZXV6c1JCT2xGdzlxNHJhaFRVbWU2V0F4ejVOZldPd09pMHR3TlZpM0UydjJMNU9hRw/messages/%40original'
+      attachments: undefined,
+      sticker_ids: undefined,
+[Command/play] DiscordAPIError[50027]: Invalid Webhook Token
+    at handleErrors (/app/node_modules/@discordjs/rest/dist/index.js:762:13)
+      thread_name: undefined,
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      applied_tags: undefined,
+      poll: undefined
+    at async SequentialHandler.runRequest (/app/node_modules/@discordjs/rest/dist/index.js:1163:23)
+    }
+    at async SequentialHandler.queueRequest (/app/node_modules/@discordjs/rest/dist/index.js:994:14)
+  },
+    at async _REST.request (/app/node_modules/@discordjs/rest/dist/index.js:1307:22)
+    at async InteractionWebhook.editMessage (/app/node_modules/discord.js/src/structures/Webhook.js:351:15)
+    at async ChatInputCommandInteraction.editReply (/app/node_modules/discord.js/src/structures/interfaces/InteractionResponses.js:247:17)
+    at async Client.<anonymous> (/app/src/index.js:409:5) {
+  requestBody: {
+    files: [],
+      embeds: [Array],
+    json: {
+      content: undefined,
+      components: undefined,
+      tts: false,
+      username: undefined,
+      nonce: undefined,
+      attachments: undefined,
+      enforce_nonce: false,
+      avatar_url: undefined,
+      sticker_ids: undefined,
+      allowed_mentions: undefined,
+      flags: undefined,
+      thread_name: undefined,
+      applied_tags: undefined,
+      message_reference: undefined,
+    }
+      poll: undefined
+  },
+  rawError: { message: 'Invalid Webhook Token', code: 50027 },
+  code: 50027,
+  status: 401,
+  method: 'PATCH',
+  url: 'https://discord.com/api/v10/webhooks/1517842487023239230/aW50ZXJhY3Rpb246MTUyNjA5ODk2MDcxNDgyOTg0NDpqUXVxaTlCeHA2b0Zmc1pIWlRRa2Y4N2hvTmNzODZISW9ZN0dMVnozV2NiQ3BJcngzcThhMFFuQkNtTHF2TnY1OFRINXpkMTBwMGdTeTAzZzBWUUZ0ZVY4aTQyRGhLZG5pVDJaU2hCQ1VlcnRyRHduSVVGbFF1enp5b0l1WnNjaQ/messages/%40original'
+}
+[Command/play] DiscordAPIError[50027]: Invalid Webhook Token
+    at handleErrors (/app/node_modules/@discordjs/rest/dist/index.js:762:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async SequentialHandler.runRequest (/app/node_modules/@discordjs/rest/dist/index.js:1163:23)
+    at async SequentialHandler.queueRequest (/app/node_modules/@discordjs/rest/dist/index.js:994:14)
+    at async _REST.request (/app/node_modules/@discordjs/rest/dist/index.js:1307:22)
+    at async InteractionWebhook.editMessage (/app/node_modules/discord.js/src/structures/Webhook.js:351:15)
+    at async ChatInputCommandInteraction.editReply (/app/node_modules/discord.js/src/structures/interfaces/InteractionResponses.js:247:17)
+    at async Client.<anonymous> (/app/src/index.js:409:5) {
+  requestBody: {
+    files: [],
+    json: {
+      content: undefined,
+      tts: false,
+      flags: undefined,
+      nonce: undefined,
+  url: 'https://discord.com/api/v10/webhooks/1517842487023239230/aW50ZXJhY3Rpb246MTUyNjA5OTIwMTU4MTEyMTYzNzplOTdaYWlkM0ZNV0RRNjREU3k2REh1NEdiNzVNUjN2SFRoTzFqWGlpdXpqQXBBTnlhNXpyOFk3MnpJdENmQWZTUmRUUnhKUTdOVlJmdjlGTjlWdjNPSUR6RmlzU1FIdEJRWUk2OUYwZlBlODExV2FGT1I3a1dmWjllMUhCSVdtdQ/messages/%40original'
+      message_reference: undefined,
+      poll: undefined
+}
+      attachments: undefined,
+    }
+      enforce_nonce: false,
+      sticker_ids: undefined,
+  },
+      thread_name: undefined,
+  rawError: { message: 'Invalid Webhook Token', code: 50027 },
+      applied_tags: undefined,
+  code: 50027,
+  status: 401,
+  method: 'PATCH',
+      embeds: [Array],
+      components: undefined,
+      username: undefined,
+      avatar_url: undefined,
+      allowed_mentions: undefined,
