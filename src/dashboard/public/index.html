@@ -148,6 +148,7 @@
       <div class="transport">
         <button class="btn btn-icon act-playpause" title="Play / Pause">⏸</button>
         <button class="btn btn-icon act-skip" title="Skip">⏭</button>
+        <button class="btn btn-icon act-shuffle" title="Shuffle queue">🔀</button>
         <button class="btn btn-icon act-stop" title="Stop &amp; clear queue">⏹</button>
         <button class="btn btn-icon act-disconnect" title="Disconnect">⏏</button>
       </div>
@@ -163,6 +164,14 @@
         <button class="btn btn-toggle act-loop" data-mode="track">track</button>
         <button class="btn btn-toggle act-loop" data-mode="queue">queue</button>
       </div>
+    </div>
+
+    <div class="search-box">
+      <div class="search-input-row">
+        <input type="text" class="search-input" placeholder="Search a song, or paste a link…" autocomplete="off">
+        <button class="btn btn-icon act-search" title="Search">🔍</button>
+      </div>
+      <ul class="search-results hidden"></ul>
     </div>
 
     <details class="queue-disclosure">

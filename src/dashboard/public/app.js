@@ -460,6 +460,7 @@ function wireCardControls(card, guildId) {
     post(isPaused ? "resume" : "pause", null, { successMessage: isPaused ? "Resumed" : "Paused" });
   });
   card.querySelector(".act-skip").addEventListener("click", () => post("skip", null, { successMessage: "Skipped" }));
+  card.querySelector(".act-shuffle").addEventListener("click", () => post("shuffle", null, { successMessage: "Queue shuffled" }));
   card.querySelector(".act-stop").addEventListener("click", () => post("stop", null, { successMessage: "Stopped & cleared queue" }));
   card.querySelector(".act-disconnect").addEventListener("click", async () => {
     const ok = await askConfirm("Disconnect this player and clear its queue?");
@@ -475,6 +476,133 @@ function wireCardControls(card, guildId) {
   for (const btn of card.querySelectorAll(".act-loop")) {
     btn.addEventListener("click", () => post("loop", { mode: btn.dataset.mode }, { successMessage: `Loop: ${btn.dataset.mode}` }));
   }
+
+  wireSearchBox(card, guildId);
+}
+
+// ─── Search box — "play directly from website" ─────────────────────────
+function wireSearchBox(card, guildId) {
+  const input   = card.querySelector(".search-input");
+  const btn     = card.querySelector(".act-search");
+  const results = card.querySelector(".search-results");
+
+  let requestId = 0;
+  let debounceTimer = null;
+
+  function showResults(html) {
+    results.innerHTML = html;
+    results.classList.remove("hidden");
+  }
+
+  function renderResultItem(r) {
+    const li = document.createElement("li");
+    li.className = "search-result";
+
+    const art = document.createElement("img");
+    art.className = "sr-art";
+    art.src = r.artwork || FALLBACK_ART;
+    art.alt = "";
+
+    const info = document.createElement("div");
+    info.className = "sr-info";
+    const title = document.createElement("div");
+    title.className = "sr-title";
+    title.textContent = r.title;
+    const meta = document.createElement("div");
+    meta.className = "sr-meta";
+    meta.textContent = `${r.author} · ${r.durationFmt}`;
+    info.append(title, meta);
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "btn btn-icon sr-add";
+    addBtn.title = "Add to queue";
+    addBtn.textContent = "＋";
+    addBtn.addEventListener("click", () => addToQueue(r.token, r.title));
+
+    li.append(art, info, addBtn);
+    return li;
+  }
+
+  async function addToQueue(token, title) {
+    try {
+      const res = await apiFetch(`/api/players/${guildId}/queue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast(data.error || "Couldn't queue that track.", { type: "error" });
+        return;
+      }
+      toast(`Queued: ${title}`);
+      results.classList.add("hidden");
+      results.innerHTML = "";
+      input.value = "";
+    } catch {
+      toast("Couldn't queue — connection issue.", { type: "error" });
+    }
+  }
+
+  async function runSearch() {
+    const query = input.value.trim();
+    if (!query) {
+      results.classList.add("hidden");
+      results.innerHTML = "";
+      return;
+    }
+
+    const myRequestId = ++requestId;
+    showResults(`<li class="search-status">Searching…</li>`);
+
+    try {
+      const res = await apiFetch(`/api/players/${guildId}/search?query=${encodeURIComponent(query)}`);
+      if (myRequestId !== requestId) return; // a newer search superseded this one
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showResults(`<li class="search-status">${data.error || "Search failed."}</li>`);
+        return;
+      }
+
+      const { results: tracks = [] } = await res.json();
+      if (myRequestId !== requestId) return;
+
+      if (!tracks.length) {
+        showResults(`<li class="search-status">No results found.</li>`);
+        return;
+      }
+
+      results.innerHTML = "";
+      results.classList.remove("hidden");
+      for (const r of tracks) results.appendChild(renderResultItem(r));
+    } catch {
+      if (myRequestId !== requestId) return;
+      showResults(`<li class="search-status">Connection issue — try again.</li>`);
+    }
+  }
+
+  input.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runSearch, 400);
+  });
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      clearTimeout(debounceTimer);
+      runSearch();
+    }
+  });
+  btn.addEventListener("click", () => {
+    clearTimeout(debounceTimer);
+    runSearch();
+  });
+
+  // Click outside closes the results dropdown
+  document.addEventListener("click", e => {
+    if (!card.contains(e.target)) results.classList.add("hidden");
+  });
 }
 
 // ─── Boot ───────────────────────────────────────────────────────────────
