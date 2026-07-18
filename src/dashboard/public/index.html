@@ -12,9 +12,6 @@
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════════════════
-     TOASTS & MODALS
-════════════════════════════════════════════════════════ -->
 <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
 
 <div id="confirm-modal" class="modal-veil hidden">
@@ -27,9 +24,7 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════════════════
-     LOGIN SCREEN
-════════════════════════════════════════════════════════ -->
+<!-- LOGIN -->
 <section id="login-screen" class="login-screen">
   <form id="login-form" class="login-card" autocomplete="off">
     <div class="login-logo">
@@ -41,24 +36,18 @@
     </div>
     <h1 class="login-title">Welcome back</h1>
     <p class="login-sub">Control your music playback with style</p>
-    
     <div class="form-group">
       <input type="password" id="password-input" name="password" placeholder="Enter password" required autocomplete="current-password">
       <p class="login-error" id="login-error" role="alert"></p>
     </div>
-    
     <button type="submit" class="btn btn-primary btn-block" id="login-btn">Sign in</button>
   </form>
 </section>
 
-<!-- ══════════════════════════════════════════════════════
-     DASHBOARD APP SHELL
-════════════════════════════════════════════════════════ -->
+<!-- DASHBOARD -->
 <div id="dashboard" class="app hidden">
 
-  <!-- ── Sidebar ────────────────────────────────────── -->
   <aside class="sidebar">
-    <!-- Brand -->
     <div class="sidebar-brand">
       <svg viewBox="0 0 28 28" fill="none">
         <circle cx="14" cy="14" r="14" fill="#6c63ff"/>
@@ -66,30 +55,20 @@
       </svg>
       <span class="brand-name">Music Bot</span>
     </div>
-
-    <!-- Navigation -->
     <nav class="sidebar-nav">
       <a class="nav-item active" href="#" data-view="home">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-        </svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
         <span>Home</span>
       </a>
       <a class="nav-item" href="#" data-view="queue">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M3 18h12v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
-        </svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h12v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
         <span>Queue</span>
       </a>
       <a class="nav-item" href="#" data-view="history">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
-        </svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
         <span>History</span>
       </a>
     </nav>
-
-    <!-- Status Section -->
     <div class="sidebar-status">
       <div class="status-row">
         <span class="online-dot" id="online-led"></span>
@@ -97,133 +76,110 @@
         <span class="status-label" id="status-label">Offline</span>
       </div>
       <div class="stat-grid">
-        <div class="sg-item">
-          <span id="stat-ping" class="sg-val">—</span>
-          <span class="sg-key">Ping</span>
-        </div>
-        <div class="sg-item">
-          <span id="stat-guilds" class="sg-val">—</span>
-          <span class="sg-key">Servers</span>
-        </div>
-        <div class="sg-item">
-          <span id="stat-live" class="sg-val">—</span>
-          <span class="sg-key">Playing</span>
-        </div>
-        <div class="sg-item">
-          <span id="stat-uptime" class="sg-val">—</span>
-          <span class="sg-key">Uptime</span>
-        </div>
+        <div class="sg-item"><span id="stat-ping" class="sg-val">—</span><span class="sg-key">Ping</span></div>
+        <div class="sg-item"><span id="stat-guilds" class="sg-val">—</span><span class="sg-key">Servers</span></div>
+        <div class="sg-item"><span id="stat-live" class="sg-val">—</span><span class="sg-key">Playing</span></div>
+        <div class="sg-item"><span id="stat-uptime" class="sg-val">—</span><span class="sg-key">Uptime</span></div>
       </div>
     </div>
-
-    <!-- Logout Button -->
     <button class="btn btn-ghost sidebar-logout" id="logout-btn">
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
-      </svg>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
       <span>Sign out</span>
     </button>
   </aside>
 
-  <!-- ── Main Content ──────────────────────────────── -->
   <div class="main-wrap">
-    
-    <!-- Top Bar -->
     <header class="topbar">
       <div class="topbar-search">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-        </svg>
-        <input id="global-search" type="text" placeholder="Search songs or artists…" autocomplete="off">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input id="global-search" type="text" placeholder="Search songs or artists..." autocomplete="off">
       </div>
     </header>
 
-    <!-- Content Area -->
     <main class="content" id="content">
 
-      <!-- Spotlight / Now Playing Hero -->
-      <section id="spotlight" class="spotlight hidden">
-        <div class="spotlight-bg" id="spotlight-bg"></div>
-        <div class="spotlight-body">
-          <div class="spotlight-art-wrap">
-            <img class="spotlight-art" id="spotlight-art" alt="Album art">
-            <canvas id="spotlight-viz" class="spotlight-viz" width="180" height="180" aria-hidden="true"></canvas>
-          </div>
-          <div class="spotlight-info">
-            <div class="spotlight-live">
-              <span class="live-pill">● LIVE</span>
-              <span id="spotlight-guild"></span>
-            </div>
-            <h2 class="spotlight-title" id="spotlight-title">Nothing playing</h2>
-            <p class="spotlight-sub" id="spotlight-author"></p>
-            <div class="prog-row">
-              <span class="prog-t" id="spotlight-elapsed">0:00</span>
-              <div class="prog-track">
-                <div class="prog-fill" id="spotlight-fill"></div>
-              </div>
-              <span class="prog-t" id="spotlight-duration">0:00</span>
-            </div>
-          </div>
+      <!-- HOME / DISCOVERY -->
+      <section id="view-home" class="view-section">
+        <!-- Genres -->
+        <div class="discover-section">
+          <h2 class="discover-title">Choose a genre to get started</h2>
+          <p class="discover-sub">Your playlist will evolve based on what you like or skip.</p>
+          <div class="genres-scroll" id="genres-scroll"></div>
         </div>
-      
-      <!-- Spotify Recommendations -->
-      <section id="spotify-recs" class="recs-panel hidden">
-        <div class="recs-header">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-          </svg>
-          <h3>Spotify Recommendations</h3>
-          <span class="recs-sub">Based on what you are playing</span>
+
+        <!-- Featured -->
+        <div class="discover-section">
+          <h2 class="discover-title">Featured for you</h2>
+          <div class="featured-grid" id="featured-grid"></div>
         </div>
-        <div class="recs-grid" id="recs-grid"></div>
+
+        <!-- Discover -->
+        <div class="discover-section">
+          <h2 class="discover-title">Discover new music</h2>
+          <div class="discover-list" id="discover-list"></div>
+        </div>
       </section>
-</section>
 
-      <!-- Section Header -->
-      <div class="section-head" id="section-head">
-        <h2 class="section-title">Active Servers</h2>
-      </div>
+      <!-- QUEUE VIEW -->
+      <section id="view-queue" class="view-section hidden"></section>
 
-      <!-- Cards Grid -->
-      <div id="channels" class="cards-grid"></div>
+      <!-- HISTORY VIEW -->
+      <section id="view-history" class="view-section hidden"></section>
 
-      <!-- Empty State -->
-      <section id="empty-state" class="empty-state hidden">
-        <div class="empty-icon">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-          </svg>
-        </div>
-        <h3>Nothing playing right now</h3>
-        <p>Use <code>/play</code> in Discord to start music — it'll show up here.</p>
-      </section>
+      <!-- Legacy containers (hidden, kept for compatibility) -->
+      <section id="spotlight" class="spotlight hidden"></section>
+      <div id="channels" class="cards-grid hidden"></div>
+      <section id="empty-state" class="empty-state hidden"></section>
 
     </main>
   </div>
+
+  <!-- BOTTOM PLAYER BAR -->
+  <div id="bottom-player" class="bottom-player">
+    <div class="bp-line" id="bp-line"></div>
+    <div class="bp-body" id="bp-body">
+      <div class="bp-left">
+        <img class="bp-art" id="bp-art" src="" alt="" onerror="this.src=''">
+        <div class="bp-info">
+          <div class="bp-title" id="bp-title">Nothing playing</div>
+          <div class="bp-artist" id="bp-artist">Select a server to sync</div>
+        </div>
+      </div>
+      <div class="bp-center">
+        <div class="bp-controls">
+          <button class="bp-btn bp-prev" id="bp-prev" title="Previous">⏮</button>
+          <button class="bp-btn bp-playpause" id="bp-playpause" title="Play/Pause">▶</button>
+          <button class="bp-btn bp-next" id="bp-next" title="Skip">⏭</button>
+        </div>
+        <div class="bp-progress">
+          <span class="bp-time" id="bp-elapsed">0:00</span>
+          <div class="bp-track"><div class="bp-fill" id="bp-fill"></div></div>
+          <span class="bp-time" id="bp-duration">0:00</span>
+        </div>
+      </div>
+      <div class="bp-right">
+        <div class="bp-guild-tag" id="bp-guild">No guild</div>
+        <button class="bp-btn bp-loop" id="bp-loop" title="Loop">🔁</button>
+        <button class="bp-btn bp-shuffle" id="bp-shuffle" title="Shuffle">🔀</button>
+        <input type="range" class="bp-vol" id="bp-vol" min="0" max="100" value="100">
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<!-- ══════════════════════════════════════════════════════
-     CHANNEL CARD TEMPLATE
-════════════════════════════════════════════════════════ -->
+<!-- CHANNEL CARD TEMPLATE (legacy, hidden) -->
 <template id="channel-template">
   <article class="channel-card" data-guild-id="">
-
-    <!-- Album Art -->
     <div class="cc-art-wrap">
       <img class="cc-art" alt="Album artwork" width="200" height="200">
       <div class="cc-art-overlay">
         <button class="cc-play-btn act-playpause" title="Play / Pause">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 4h4v16H6zm8 0h4v16h-4z"/>
-          </svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
         </button>
       </div>
-      <div class="cc-eq" aria-hidden="true">
-        <span></span><span></span><span></span><span></span>
-      </div>
+      <div class="cc-eq" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
     </div>
-
-    <!-- Track Info -->
     <div class="cc-info">
       <div class="cc-track-title"></div>
       <div class="cc-track-author"></div>
@@ -232,82 +188,40 @@
         <span class="cc-badge"></span>
       </div>
     </div>
-
-    <!-- Progress Bar -->
     <div class="prog-row cc-prog">
       <span class="prog-t prog-elapsed">0:00</span>
-      <div class="prog-track">
-        <div class="prog-fill"></div>
-      </div>
+      <div class="prog-track"><div class="prog-fill"></div></div>
       <span class="prog-t prog-duration">0:00</span>
     </div>
-
-    <!-- Expanded Controls -->
     <div class="cc-controls">
       <div class="cc-transport">
-        <button class="cc-btn act-shuffle" title="Shuffle">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
-          </svg>
-        </button>
-        <button class="cc-btn act-skip" title="Skip">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
-          </svg>
-        </button>
-        <button class="cc-btn cc-btn-danger act-stop" title="Stop">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <rect x="6" y="6" width="12" height="12"/>
-          </svg>
-        </button>
-        <button class="cc-btn cc-btn-danger act-disconnect" title="Disconnect">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18z"/>
-          </svg>
-        </button>
+        <button class="cc-btn act-shuffle" title="Shuffle"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
+        <button class="cc-btn act-skip" title="Skip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+        <button class="cc-btn cc-btn-danger act-stop" title="Stop"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg></button>
+        <button class="cc-btn act-disconnect" title="Disconnect"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></button>
       </div>
-
-      <!-- Volume & Loop -->
-      <div class="cc-secondary">
-        <div class="vol-wrap">
-          <svg viewBox="0 0 24 24" fill="currentColor" class="vol-ico">
-            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-          </svg>
-          <input type="range" class="vol-slider act-volume" min="0" max="100" value="100" aria-label="Volume">
-          <span class="vol-val">100</span>
-        </div>
-        <div class="loop-wrap">
-          <button class="loop-btn act-loop" data-mode="off" title="Loop off">Off</button>
-          <button class="loop-btn act-loop" data-mode="track" title="Loop track">Track</button>
-          <button class="loop-btn act-loop" data-mode="queue" title="Loop queue">Queue</button>
-        </div>
+      <div class="cc-volume">
+        <input type="range" class="act-volume" min="0" max="100" value="100">
+        <span class="vol-val">100</span>
+      </div>
+      <div class="cc-loop">
+        <button class="cc-btn act-loop" data-mode="off" title="Loop off">↻</button>
+        <button class="cc-btn act-loop" data-mode="track" title="Loop track">↻1</button>
+        <button class="cc-btn act-loop" data-mode="queue" title="Loop queue">↻∞</button>
       </div>
     </div>
-
-    <!-- Search -->
     <div class="cc-search">
-      <div class="cc-search-bar">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-        </svg>
-        <input type="text" class="search-input" placeholder="Add to queue…" autocomplete="off">
-        <button type="button" class="act-search cc-search-go">Go</button>
-      </div>
+      <input type="text" class="search-input" placeholder="Search or paste URL..." autocomplete="off">
+      <button class="cc-btn act-search" title="Search"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></button>
       <ul class="search-results hidden"></ul>
     </div>
-
-    <!-- Queue -->
-    <details class="cc-queue-wrap">
-      <summary class="cc-queue-toggle">
-        Up next <span class="queue-count">0</span>
-      </summary>
-      <ol class="queue-list"></ol>
-    </details>
-
+    <div class="cc-queue">
+      <h4 class="queue-head">Up next</h4>
+      <ul class="queue-list"></ul>
+    </div>
   </article>
 </template>
 
-<!-- Scripts -->
 <script src="/socket.io/socket.io.js"></script>
 <script src="/app.js"></script>
 </body>

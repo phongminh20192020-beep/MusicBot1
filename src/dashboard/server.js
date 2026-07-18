@@ -60,6 +60,8 @@ function startDashboard(client) {
   app.use(express.json());
   app.use(express.static(path.join(__dirname, "public")));
 
+  app.get("/api/health", (req, res) => res.json({ status: "ok", uptime: process.uptime() }));
+
   app.get("/api/me", (req, res) => {
     const token = parseCookies(req.headers.cookie)[COOKIE_NAME];
     res.json({ authenticated: isValid(token) });
@@ -196,6 +198,68 @@ function startDashboard(client) {
       res.json({ tracks: recs });
     } catch (err) {
       console.error("[Dashboard] Recommendations error:", err.message);
+      res.json({ tracks: [] });
+    }
+  });
+
+  // ─── Discovery / Featured (no player required) ────
+  app.get("/api/featured", requireAuth, async (req, res) => {
+    try {
+      let tracks = [];
+      // Try to get from any active player first
+      const players = [...client.lavalink.players.values()];
+      const active = players.find(p => p.playing && p.queue?.current);
+      if (active && active.queue.current.info.sourceName === "spotify") {
+        const sid = extractSpotifyId(active.queue.current.info.uri);
+        if (sid && process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
+          const spotifyTracks = await getSpotifyRecommendations(sid, 6);
+          tracks = spotifyTracks.map(t => ({
+            title: t.name,
+            artist: t.artists?.map(a => a.name).join(", ") || "Unknown",
+            uri: `ytmsearch:${encodeURIComponent((t.artists?.[0]?.name || "") + " " + t.name)}`,
+            artwork: t.album?.images?.[0]?.url || null,
+            durationFmt: "3:45",
+          }));
+        }
+      }
+      // Fallback static
+      if (!tracks.length) {
+        tracks = [
+          { title: "APT.", artist: "ROSÉ, Bruno Mars", artwork: null, uri: "ytmsearch:APT ROSÉ Bruno Mars", durationFmt: "2:53" },
+          { title: "Cool With You", artist: "NewJeans", artwork: null, uri: "ytmsearch:Cool With You NewJeans", durationFmt: "3:21" },
+          { title: "Ice Field", artist: "WYS", artwork: null, uri: "ytmsearch:Ice Field WYS", durationFmt: "2:45" },
+          { title: "BAND4BAND", artist: "Central Cee, Lil Baby", artwork: null, uri: "ytmsearch:BAND4BAND Central Cee Lil Baby", durationFmt: "2:20" },
+          { title: "Not Like Us", artist: "Kendrick Lamar", artwork: null, uri: "ytmsearch:Not Like Us Kendrick Lamar", durationFmt: "4:23" },
+          { title: "Espresso", artist: "Sabrina Carpenter", artwork: null, uri: "ytmsearch:Espresso Sabrina Carpenter", durationFmt: "2:55" },
+        ];
+      }
+      res.json({ tracks });
+    } catch (err) {
+      console.error("[Dashboard] Featured error:", err.message);
+      res.json({ tracks: [] });
+    }
+  });
+
+  app.get("/api/discover", requireAuth, async (req, res) => {
+    // Same as featured for now
+    try {
+      const node = client.lavalink.nodeManager.nodes.first();
+      if (node && node.connected) {
+        const result = await node.search({ query: "top hits 2024", source: "ytmsearch" }, { username: "Dashboard", tag: "Dashboard" }).catch(() => null);
+        if (result && result.tracks) {
+          const tracks = result.tracks.slice(0, 8).map(t => ({
+            title: t.info.title,
+            artist: t.info.author || "Unknown",
+            artwork: t.info.artworkUrl || (t.info.identifier ? `https://img.youtube.com/vi/${t.info.identifier}/mqdefault.jpg` : null),
+            uri: t.info.uri,
+            durationFmt: t.info.isStream ? "LIVE" : formatDuration(t.info.duration || 0),
+          }));
+          return res.json({ tracks });
+        }
+      }
+      res.json({ tracks: [] });
+    } catch (err) {
+      console.error("[Dashboard] Discover error:", err.message);
       res.json({ tracks: [] });
     }
   });
