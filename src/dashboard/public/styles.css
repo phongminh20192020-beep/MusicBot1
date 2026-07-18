@@ -1593,3 +1593,92 @@ input {
     max-width: unset;
   }
 }
+
+
+/* ══════════════════════════════════════════════════════
+   SPOTIFY RECOMMENDATIONS PANEL
+════════════════════════════════════════════════════════ */
+
+.recs-panel {
+  margin: 0 0 20px 0;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.recs-panel.hidden {
+  display: none !important;
+}
+
+.recs-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.recs-header svg {
+  color: #1db954;
+  flex-shrink: 0;
+}
+
+.recs-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.recs-sub {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-left: auto;
+}
+
+.recs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.rec-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.rec-card:hover {
+  border-color: #1db954;
+  transform: translateY(-2px);
+}
+
+.rec-art {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  object-fit: cover;
+  margin-bottom: 10px;
+  background: var(--surface-3);
+}
+
+.rec-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+
+.rec-artist {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
