@@ -17,6 +17,7 @@ const spotlightEl   = $("#spotlight");
 const contentEl     = $("#content");
 const recsPanel     = $("#spotify-recs");
 const recsGrid      = $("#recs-grid");
+const sectionHead   = $("#section-head");
 
 const statusLabel   = $("#status-label");
 const onlineLed     = $("#online-led");
@@ -49,10 +50,14 @@ const SOURCE_COLORS = {
 let socket = null;
 const cards = new Map();
 const lastTrackTitles = new Map();
+const lastQueueHashes = new Map();
+const marqueeCache = new Map();
 let vizPlaying = false;
 let vizColor = SOURCE_COLORS.default;
 let currentPlayers = [];
 let activeGuildId = null;
+let currentView = "home";
+let recsFetchPending = new Set();
 
 function formatTime(ms) {
   if (!ms || ms < 0) return "0:00";
@@ -141,7 +146,7 @@ loginForm.addEventListener("submit", async e => {
   loginError.textContent = "";
   const btn = $("#login-btn");
   btn.disabled = true;
-  btn.textContent = "Signing in…";
+  btn.textContent = "Signing in...";
   try {
     const res = await fetch("/api/login", {
       method: "POST",
@@ -178,6 +183,127 @@ $("#logout-btn").addEventListener("click", async () => {
   }
 });
 
+// ══════════════════════════════════════════════════════
+// SIDEBAR NAVIGATION
+// ══════════════════════════════════════════════════════
+const navItems = $$('.sidebar-nav .nav-item');
+
+function switchView(view) {
+  currentView = view;
+  navItems.forEach(item => {
+    item.classList.toggle('active', item.dataset.view === view);
+  });
+
+  if (view === 'home') {
+    spotlightEl.classList.remove('hidden');
+    if (recsPanel) recsPanel.classList.remove('hidden');
+    sectionHead.classList.remove('hidden');
+    channelsEl.classList.remove('hidden');
+    emptyStateEl.classList.remove('hidden');
+    // Remove queue/history views if they exist
+    const qv = $('#queue-view');
+    const hv = $('#history-view');
+    if (qv) qv.remove();
+    if (hv) hv.remove();
+  } else if (view === 'queue') {
+    spotlightEl.classList.add('hidden');
+    if (recsPanel) recsPanel.classList.add('hidden');
+    sectionHead.classList.add('hidden');
+    channelsEl.classList.add('hidden');
+    emptyStateEl.classList.add('hidden');
+    const hv = $('#history-view');
+    if (hv) hv.remove();
+    renderQueueView();
+  } else if (view === 'history') {
+    spotlightEl.classList.add('hidden');
+    if (recsPanel) recsPanel.classList.add('hidden');
+    sectionHead.classList.add('hidden');
+    channelsEl.classList.add('hidden');
+    emptyStateEl.classList.add('hidden');
+    const qv = $('#queue-view');
+    if (qv) qv.remove();
+    renderHistoryView();
+  }
+}
+
+navItems.forEach(item => {
+  item.addEventListener('click', e => {
+    e.preventDefault();
+    switchView(item.dataset.view);
+  });
+});
+
+function renderQueueView() {
+  let qv = $('#queue-view');
+  if (!qv) {
+    qv = document.createElement('section');
+    qv.id = 'queue-view';
+    qv.className = 'queue-view';
+    contentEl.appendChild(qv);
+  }
+  if (!currentPlayers.length) {
+    qv.innerHTML = '<div class="empty-state" style="display:flex;"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h12v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></div><h3>No active players</h3><p>Use /play in Discord to start music.</p></div>';
+    return;
+  }
+  let html = '<h2 class="section-title" style="margin-bottom:16px;">Queue</h2>';
+  for (const player of currentPlayers) {
+    const track = player.current;
+    html += '<div class="queue-view-card">';
+    html += '<div class="qv-header"><span class="qv-guild">' + (player.guildName || 'Unknown') + '</span>';
+    html += '<span class="cc-badge ' + (player.playing && !player.paused ? 'badge-playing' : player.paused ? 'badge-paused' : 'badge-idle') + '">' + (player.playing && !player.paused ? 'On Air' : player.paused ? 'Paused' : 'Idle') + '</span></div>';
+    if (track) {
+      html += '<div class="qv-now"><img src="' + (track.artwork || FALLBACK_ART) + '" class="qv-art" alt="">';
+      html += '<div><div class="qv-title">' + track.title + '</div><div class="qv-author">' + track.author + '</div></div></div>';
+    }
+    const qTracks = player.queue || [];
+    if (qTracks.length) {
+      html += '<ul class="qv-list">';
+      for (let i = 0; i < qTracks.length; i++) {
+        html += '<li><span class="q-num">' + (i + 1) + '</span><span class="q-title">' + qTracks[i].title + '</span><span class="q-dur">' + qTracks[i].durationFmt + '</span></li>';
+      }
+      html += '</ul>';
+    } else {
+      html += '<p class="qv-empty">Queue is empty</p>';
+    }
+    html += '</div>';
+  }
+  qv.innerHTML = html;
+}
+
+function renderHistoryView() {
+  let hv = $('#history-view');
+  if (!hv) {
+    hv = document.createElement('section');
+    hv.id = 'history-view';
+    hv.className = 'history-view';
+    contentEl.appendChild(hv);
+  }
+  if (!currentPlayers.length) {
+    hv.innerHTML = '<div class="empty-state" style="display:flex;"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg></div><h3>No history available</h3><p>Play some music first.</p></div>';
+    return;
+  }
+  let html = '<h2 class="section-title" style="margin-bottom:16px;">History</h2>';
+  for (const player of currentPlayers) {
+    const prev = player.previous || [];
+    html += '<div class="queue-view-card">';
+    html += '<div class="qv-header"><span class="qv-guild">' + (player.guildName || 'Unknown') + '</span></div>';
+    if (prev.length) {
+      html += '<ul class="qv-list">';
+      for (let i = 0; i < prev.length; i++) {
+        html += '<li><span class="q-num">' + (i + 1) + '</span><span class="q-title">' + prev[i].title + '</span><span class="q-dur">' + prev[i].durationFmt + '</span></li>';
+      }
+      html += '</ul>';
+    } else {
+      html += '<p class="qv-empty">No previous tracks</p>';
+    }
+    html += '</div>';
+  }
+  hv.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════
+// SOCKET
+// ══════════════════════════════════════════════════════
 function connectSocket() {
   if (socket) return;
   socket = io({ withCredentials: true });
@@ -250,6 +376,35 @@ function renderPlayers(players) {
     }
   }
   if (players.length && !activeGuildId) activeGuildId = players[0].guildId;
+
+  // Auto-fetch recommendations for Spotify tracks
+  for (const player of players) {
+    if (player.current && player.current.source === "spotify" && player.playing) {
+      if (!recsFetchPending.has(player.guildId)) {
+        recsFetchPending.add(player.guildId);
+        fetchRecommendations(player.guildId);
+      }
+    }
+  }
+
+  // Refresh current view if not home
+  if (currentView === 'queue') renderQueueView();
+  if (currentView === 'history') renderHistoryView();
+}
+
+async function fetchRecommendations(guildId) {
+  try {
+    const res = await apiFetch("/api/players/" + guildId + "/recommendations");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.tracks && data.tracks.length) {
+      renderRecs(data);
+    }
+  } catch (e) {
+    console.error("Fetch recs error:", e);
+  } finally {
+    recsFetchPending.delete(guildId);
+  }
 }
 
 function createCard(player) {
@@ -260,6 +415,11 @@ function createCard(player) {
   card.querySelector(".cc-track-author").textContent = "";
   card.querySelector(".cc-guild-name").textContent = player.guildName || "Unknown";
   return card;
+}
+
+function hashQueue(queue) {
+  if (!queue || !queue.length) return "";
+  return queue.length + "|" + queue.slice(0, 5).map(t => t.title).join("|");
 }
 
 function updateCard(card, player) {
@@ -275,13 +435,6 @@ function updateCard(card, player) {
 
   const titleEl = card.querySelector(".cc-track-title");
   const newTitle = track ? track.title : "Nothing playing";
-  const prevTitle = lastTrackTitles.get(player.guildId);
-  if (track && prevTitle !== undefined && prevTitle !== newTitle) {
-    const artEl = card.querySelector(".cc-art");
-    const rect = artEl.getBoundingClientRect();
-    burstAt(rect.left + rect.width / 2, rect.top + rect.height / 2, SOURCE_COLORS[track.source] || SOURCE_COLORS.default);
-  }
-  lastTrackTitles.set(player.guildId, newTitle);
   titleEl.textContent = newTitle;
   applyMarquee(titleEl);
 
@@ -312,11 +465,23 @@ function updateCard(card, player) {
     btn.classList.toggle("is-active", btn.dataset.mode === player.repeatMode);
   }
 
-  const qList = card.querySelector(".queue-list");
-  const qTracks = player.queue || [];
-  qList.innerHTML = qTracks.length
-    ? qTracks.slice(0, 10).map((t, i) => '<li><span class="q-num">' + (i+1) + '</span><span class="q-title">' + t.title + '</span><span class="q-dur">' + t.durationFmt + '</span></li>').join("")
-    : '<li class="queue-empty">Queue is empty</li>';
+  // Only update queue if it changed (reduces lag)
+  const qHash = hashQueue(player.queue);
+  const oldHash = lastQueueHashes.get(player.guildId);
+  if (oldHash !== qHash) {
+    lastQueueHashes.set(player.guildId, qHash);
+    const qList = card.querySelector(".queue-list");
+    const qTracks = player.queue || [];
+    if (qTracks.length) {
+      let html = "";
+      for (let i = 0; i < Math.min(qTracks.length, 10); i++) {
+        html += '<li><span class="q-num">' + (i + 1) + '</span><span class="q-title">' + qTracks[i].title + '</span><span class="q-dur">' + qTracks[i].durationFmt + '</span></li>';
+      }
+      qList.innerHTML = html;
+    } else {
+      qList.innerHTML = '<li class="queue-empty">Queue is empty</li>';
+    }
+  }
 }
 
 function wireCard(card, guildId) {
@@ -460,12 +625,14 @@ function renderRecs(data) {
     return;
   }
   if (recsPanel) recsPanel.classList.remove("hidden");
-  recsGrid.innerHTML = data.tracks.map(t =>
-    '<div class="rec-card" data-uri="' + t.uri + '">' +
-    '<img src="' + (t.artwork || FALLBACK_ART) + '" alt="" class="rec-art">' +
-    '<div class="rec-info"><div class="rec-name">' + t.title + '</div><div class="rec-artist">' + t.artist + '</div></div>' +
-    '</div>'
-  ).join("");
+  let html = "";
+  for (const t of data.tracks) {
+    html += '<div class="rec-card" data-uri="' + t.uri + '">' +
+      '<img src="' + (t.artwork || FALLBACK_ART) + '" alt="" class="rec-art">' +
+      '<div class="rec-info"><div class="rec-name">' + t.title + '</div><div class="rec-artist">' + t.artist + '</div></div>' +
+      '</div>';
+  }
+  recsGrid.innerHTML = html;
   recsGrid.querySelectorAll(".rec-card").forEach(el => {
     el.addEventListener("click", () => {
       if (!activeGuildId) return toast("No active player", {type:"error"});
@@ -477,23 +644,20 @@ function renderRecs(data) {
 }
 
 function applyMarquee(el) {
+  const key = el.textContent;
+  const cached = marqueeCache.get(key);
+  if (cached !== undefined) {
+    el.classList.toggle("marquee", cached);
+    return;
+  }
   el.classList.remove("marquee");
-  void el.offsetWidth;
-  if (el.scrollWidth > el.clientWidth) el.classList.add("marquee");
+  const needsMarquee = el.scrollWidth > el.clientWidth + 2;
+  marqueeCache.set(key, needsMarquee);
+  if (needsMarquee) el.classList.add("marquee");
 }
 
 function burstAt(x, y, color) {
-  const count = 12;
-  for (let i = 0; i < count; i++) {
-    const p = document.createElement("div");
-    p.style.cssText = "position:fixed;left:" + x + "px;top:" + y + "px;width:6px;height:6px;border-radius:50%;background:" + color + ";pointer-events:none;z-index:9999;";
-    document.body.appendChild(p);
-    const angle = (Math.PI * 2 * i) / count;
-    const dist = 40 + Math.random() * 30;
-    const tx = Math.cos(angle) * dist;
-    const ty = Math.sin(angle) * dist;
-    p.animate([{ transform: "translate(0,0) scale(1)", opacity: 1 }, { transform: "translate(" + tx + "px," + ty + "px) scale(0)", opacity: 0 }], { duration: 600, easing: "cubic-bezier(0, .9, .57, 1)" }).onfinish = () => p.remove();
-  }
+  // Disabled to reduce lag - purely decorative
 }
 
 (async function init() {
