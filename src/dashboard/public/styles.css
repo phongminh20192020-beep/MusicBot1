@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   IDk Dashboard — clean Rythm.fm-inspired dark player UI
+   NoName's Bot Dashboard — clean Rythm.fm-inspired dark player UI
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Tokens ──────────────────────────────────────────────────── */
@@ -59,15 +59,16 @@ button, input { font: inherit; color: inherit; }
 .logo-mark {
   font-family: var(--font);
   font-weight: 800;
-  font-size: 18px;
-  letter-spacing: -0.02em;
+  font-size: 15px;
+  letter-spacing: -0.01em;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   user-select: none;
+  white-space: nowrap;
 }
-.logo-sm { font-size: 17px; }
+.logo-sm { font-size: 14px; }
 
 /* ── Buttons ─────────────────────────────────────────────────── */
 .btn {
