@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
+<base target="_blank">
 </head>
 <body>
 
@@ -100,20 +101,15 @@
 
       <!-- HOME / DISCOVERY -->
       <section id="view-home" class="view-section">
-        <!-- Genres -->
         <div class="discover-section">
           <h2 class="discover-title">Choose a genre to get started</h2>
           <p class="discover-sub">Your playlist will evolve based on what you like or skip.</p>
           <div class="genres-scroll" id="genres-scroll"></div>
         </div>
-
-        <!-- Featured -->
         <div class="discover-section">
           <h2 class="discover-title">Featured for you</h2>
           <div class="featured-grid" id="featured-grid"></div>
         </div>
-
-        <!-- Discover -->
         <div class="discover-section">
           <h2 class="discover-title">Discover new music</h2>
           <div class="discover-list" id="discover-list"></div>
@@ -126,20 +122,14 @@
       <!-- HISTORY VIEW -->
       <section id="view-history" class="view-section hidden"></section>
 
-      <!-- Legacy containers (hidden, kept for compatibility) -->
-      <section id="spotlight" class="spotlight hidden"></section>
-      <div id="channels" class="cards-grid hidden"></div>
-      <section id="empty-state" class="empty-state hidden"></section>
-
     </main>
   </div>
 
   <!-- BOTTOM PLAYER BAR -->
-  <div id="bottom-player" class="bottom-player">
-    <div class="bp-line" id="bp-line"></div>
+  <div id="bottom-player" class="bottom-player collapsed">
     <div class="bp-body" id="bp-body">
       <div class="bp-left">
-        <img class="bp-art" id="bp-art" src="" alt="" onerror="this.src=''">
+        <img class="bp-art" id="bp-art" src="" alt="" crossorigin="anonymous">
         <div class="bp-info">
           <div class="bp-title" id="bp-title">Nothing playing</div>
           <div class="bp-artist" id="bp-artist">Select a server to sync</div>
@@ -167,60 +157,6 @@
   </div>
 
 </div>
-
-<!-- CHANNEL CARD TEMPLATE (legacy, hidden) -->
-<template id="channel-template">
-  <article class="channel-card" data-guild-id="">
-    <div class="cc-art-wrap">
-      <img class="cc-art" alt="Album artwork" width="200" height="200">
-      <div class="cc-art-overlay">
-        <button class="cc-play-btn act-playpause" title="Play / Pause">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
-        </button>
-      </div>
-      <div class="cc-eq" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-    </div>
-    <div class="cc-info">
-      <div class="cc-track-title"></div>
-      <div class="cc-track-author"></div>
-      <div class="cc-guild-row">
-        <span class="cc-guild-name"></span>
-        <span class="cc-badge"></span>
-      </div>
-    </div>
-    <div class="prog-row cc-prog">
-      <span class="prog-t prog-elapsed">0:00</span>
-      <div class="prog-track"><div class="prog-fill"></div></div>
-      <span class="prog-t prog-duration">0:00</span>
-    </div>
-    <div class="cc-controls">
-      <div class="cc-transport">
-        <button class="cc-btn act-shuffle" title="Shuffle"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
-        <button class="cc-btn act-skip" title="Skip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
-        <button class="cc-btn cc-btn-danger act-stop" title="Stop"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg></button>
-        <button class="cc-btn act-disconnect" title="Disconnect"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></button>
-      </div>
-      <div class="cc-volume">
-        <input type="range" class="act-volume" min="0" max="100" value="100">
-        <span class="vol-val">100</span>
-      </div>
-      <div class="cc-loop">
-        <button class="cc-btn act-loop" data-mode="off" title="Loop off">↻</button>
-        <button class="cc-btn act-loop" data-mode="track" title="Loop track">↻1</button>
-        <button class="cc-btn act-loop" data-mode="queue" title="Loop queue">↻∞</button>
-      </div>
-    </div>
-    <div class="cc-search">
-      <input type="text" class="search-input" placeholder="Search or paste URL..." autocomplete="off">
-      <button class="cc-btn act-search" title="Search"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></button>
-      <ul class="search-results hidden"></ul>
-    </div>
-    <div class="cc-queue">
-      <h4 class="queue-head">Up next</h4>
-      <ul class="queue-list"></ul>
-    </div>
-  </article>
-</template>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/app.js"></script>
