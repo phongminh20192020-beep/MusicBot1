@@ -84,7 +84,7 @@ function lastfmTrackToJSON(track) {
 
 // ── Artwork enrichment via Lavalink ─────────────────
 async function enrichTracksWithArtwork(client, tracks) {
-  const node = client.lavalink.nodeManager.nodes.first();
+  const node = client.lavalink.nodeManager.nodes.get("main");
   if (!node || !node.connected) {
     console.log("[Dashboard] No Lavalink node available for artwork enrichment");
     return tracks;
