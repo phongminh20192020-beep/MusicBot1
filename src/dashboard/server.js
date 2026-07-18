@@ -40,10 +40,22 @@ const LASTFM_KEY = process.env.LASTFM_API_KEY;
 
 async function lastfmFetch(method, extra) {
   if (!LASTFM_KEY) throw new Error("LASTFM_API_KEY not configured");
-  const params = new URLSearchParams({ method, api_key: LASTFM_KEY, format: "json", ...extra });
-  const res = await fetch("https://ws.audioscrobbler.com/2.0/?" + params.toString());
-  if (!res.ok) throw new Error("Last.fm API error: " + res.status);
-  return res.json();
+  const params = new URLSearchParams();
+  params.append("method", method);
+  params.append("api_key", LASTFM_KEY);
+  params.append("format", "json");
+  for (const [k, v] of Object.entries(extra || {})) {
+    if (v !== undefined && v !== null) params.append(k, String(v));
+  }
+  const url = "https://ws.audioscrobbler.com/2.0/?" + params.toString();
+  console.log("[Last.fm] Request:", url.replace(LASTFM_KEY, "***"));
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) {
+    console.error("[Last.fm] API error:", data.error, data.message);
+    throw new Error("Last.fm error " + data.error + ": " + data.message);
+  }
+  return data;
 }
 
 function lastfmTrackToJSON(track) {
@@ -51,13 +63,14 @@ function lastfmTrackToJSON(track) {
   const artist = typeof track.artist === "string" ? track.artist : (track.artist?.name || track.artist?.["#text"] || "Unknown");
   const img = Array.isArray(track.image) ? track.image : [];
   let artwork = null;
-  for (const size of ["extralarge", "large", "medium", ""]) {
+  for (const size of ["extralarge", "large", "medium", "small", ""]) {
     const found = img.find(i => i.size === size);
     if (found && found["#text"] && found["#text"].trim().length > 10) {
       artwork = found["#text"].trim();
       break;
     }
   }
+  // If no image from Last.fm, leave null so enrichTracksWithArtwork can fill it
   return {
     title: track.name || "Unknown",
     artist: artist,
@@ -72,7 +85,10 @@ function lastfmTrackToJSON(track) {
 // ── Artwork enrichment via Lavalink ─────────────────
 async function enrichTracksWithArtwork(client, tracks) {
   const node = client.lavalink.nodeManager.nodes.first();
-  if (!node || !node.connected) return tracks;
+  if (!node || !node.connected) {
+    console.log("[Dashboard] No Lavalink node available for artwork enrichment");
+    return tracks;
+  }
   const enriched = [];
   for (const track of tracks) {
     if (track.artwork && track.artwork.length > 10) {
@@ -84,11 +100,15 @@ async function enrichTracksWithArtwork(client, tracks) {
       const result = await node.search({ query, source: "ytmsearch" }, { username: "Dashboard", tag: "Dashboard" });
       if (result?.tracks?.[0]?.info?.artworkUrl) {
         track.artwork = result.tracks[0].info.artworkUrl;
+        console.log("[Dashboard] Got artwork for", track.title, ":", track.artwork.substring(0, 60) + "...");
       } else if (result?.tracks?.[0]?.info?.identifier) {
         track.artwork = `https://img.youtube.com/vi/${result.tracks[0].info.identifier}/mqdefault.jpg`;
+        console.log("[Dashboard] Got YT thumbnail for", track.title);
+      } else {
+        console.log("[Dashboard] No artwork found for", track.title);
       }
     } catch (e) {
-      // silently fail, keep color fallback
+      console.error("[Dashboard] Artwork search failed for", track.title, ":", e.message);
     }
     enriched.push(track);
   }
@@ -132,6 +152,8 @@ function getPlayerOr404(client, res, guildId) {
 
 // ── Main dashboard setup ───────────────────────────
 function startDashboard(client) {
+  console.log("[Dashboard] Starting dashboard...");
+  console.log("[Dashboard] LASTFM_API_KEY:", LASTFM_KEY ? "configured (" + LASTFM_KEY.substring(0, 4) + "****)" : "NOT SET");
   const app    = express();
   const server = http.createServer(app);
   const io     = new Server(server, { cors: { origin: false } });
@@ -274,10 +296,14 @@ function startDashboard(client) {
   // ─── Last.fm Discovery ──────────────────────────────
   app.get("/api/lastfm/trending", requireAuth, async (req, res) => {
     try {
+      console.log("[Dashboard] Fetching Last.fm trending...");
       const data = await lastfmFetch("chart.gettoptracks", { limit: "12" });
       const raw = data.tracks?.track || [];
+      console.log("[Dashboard] Last.fm returned", raw.length, "tracks");
       let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      console.log("[Dashboard] Parsed", tracks.length, "valid tracks");
       tracks = await enrichTracksWithArtwork(client, tracks);
+      console.log("[Dashboard] Enriched", tracks.length, "tracks with artwork");
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] Last.fm trending error:", err.message);
@@ -296,6 +322,16 @@ function startDashboard(client) {
     } catch (err) {
       console.error("[Dashboard] Last.fm genre error:", err.message);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/lastfm/test", requireAuth, async (req, res) => {
+    try {
+      if (!LASTFM_KEY) return res.status(503).json({ ok: false, error: "LASTFM_API_KEY not set" });
+      const data = await lastfmFetch("chart.gettoptracks", { limit: "1" });
+      res.json({ ok: true, keyPrefix: LASTFM_KEY.substring(0, 4), trackCount: data.tracks?.track?.length || 0 });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err.message });
     }
   });
 
