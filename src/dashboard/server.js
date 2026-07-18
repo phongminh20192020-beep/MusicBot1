@@ -10,6 +10,32 @@ const { COOKIE_NAME, createSession, destroySession, requireAuth, isValidFromHead
 const { statsToJSON, playerToJSON } = require("./state");
 const { formatDuration, resolveSpotify, getSpotifyRecommendations, extractSpotifyId } = require("../utils/helpers");
 
+const VALID_LOOP_MODES = new Set(["off", "track", "queue"]);
+const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
+const searchCache = new Map();
+
+// ── Rate limiting ────────────────────────────────────
+const loginAttempts = new Map();
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+  }
+  entry.count++;
+  const remaining = Math.max(0, RATE_LIMIT_MAX - entry.count);
+  return { allowed: entry.count <= RATE_LIMIT_MAX, remaining };
+}
+
+function hashPassword(pw) {
+  return crypto.createHash("sha256").update(pw).digest("hex");
+}
+
+// ── Last.fm helpers ──────────────────────────────────
 const LASTFM_KEY = process.env.LASTFM_API_KEY;
 
 async function lastfmFetch(method, extra) {
@@ -32,11 +58,6 @@ function lastfmTrackToJSON(track) {
       break;
     }
   }
-  // If no image found, try to get from track URL or use null
-  if (!artwork && track.url) {
-    // Last.fm sometimes has no images for less popular tracks
-    artwork = null;
-  }
   return {
     title: track.name || "Unknown",
     artist: artist,
@@ -48,31 +69,33 @@ function lastfmTrackToJSON(track) {
   };
 }
 
-// ── Rate limiting ────────────────────────────────────
-const loginAttempts = new Map(); // ip -> { count, resetAt }
-const RATE_LIMIT_MAX = 5;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-
-function checkRateLimit(ip) {
-  const now = Date.now();
-  const entry = loginAttempts.get(ip);
-  if (!entry || now > entry.resetAt) {
-    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+// ── Artwork enrichment via Lavalink ─────────────────
+async function enrichTracksWithArtwork(client, tracks) {
+  const node = client.lavalink.nodeManager.nodes.first();
+  if (!node || !node.connected) return tracks;
+  const enriched = [];
+  for (const track of tracks) {
+    if (track.artwork && track.artwork.length > 10) {
+      enriched.push(track);
+      continue;
+    }
+    try {
+      const query = track.artist + " " + track.title;
+      const result = await node.search({ query, source: "ytmsearch" }, { username: "Dashboard", tag: "Dashboard" });
+      if (result?.tracks?.[0]?.info?.artworkUrl) {
+        track.artwork = result.tracks[0].info.artworkUrl;
+      } else if (result?.tracks?.[0]?.info?.identifier) {
+        track.artwork = `https://img.youtube.com/vi/${result.tracks[0].info.identifier}/mqdefault.jpg`;
+      }
+    } catch (e) {
+      // silently fail, keep color fallback
+    }
+    enriched.push(track);
   }
-  entry.count++;
-  const remaining = Math.max(0, RATE_LIMIT_MAX - entry.count);
-  return { allowed: entry.count <= RATE_LIMIT_MAX, remaining };
+  return enriched;
 }
 
-function hashPassword(pw) {
-  return require("crypto").createHash("sha256").update(pw).digest("hex");
-}
-
-const VALID_LOOP_MODES = new Set(["off", "track", "queue"]);
-const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
-const searchCache = new Map();
-
+// ── Search cache ───────────────────────────────────
 function cacheSearchResult(guildId, track) {
   const token = crypto.randomUUID();
   searchCache.set(`${guildId}:${token}`, { track, expiresAt: Date.now() + SEARCH_CACHE_TTL_MS });
@@ -107,18 +130,20 @@ function getPlayerOr404(client, res, guildId) {
   return player;
 }
 
+// ── Main dashboard setup ───────────────────────────
 function startDashboard(client) {
   const app    = express();
-  app.set('trust proxy', 1);
   const server = http.createServer(app);
   const io     = new Server(server, { cors: { origin: false } });
 
   const PASSWORD = process.env.DASHBOARD_PASSWORD;
   if (!PASSWORD) console.warn("[Dashboard] DASHBOARD_PASSWORD not set — logins disabled.");
 
+  app.set('trust proxy', 1);
   app.use(express.json());
   app.use(express.static(path.join(__dirname, "public")));
 
+  // Healthcheck for Railway autoscale
   app.get("/api/health", (req, res) => res.json({ status: "ok", uptime: process.uptime() }));
 
   app.get("/api/me", (req, res) => {
@@ -127,19 +152,31 @@ function startDashboard(client) {
   });
 
   app.post("/api/login", (req, res) => {
-    console.log("[Dashboard] Login attempt from", req.ip);
+    const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown";
     const { password } = req.body || {};
+
     if (!PASSWORD) {
       console.warn("[Dashboard] Login rejected: DASHBOARD_PASSWORD not set");
       return res.status(503).json({ error: "Dashboard password not configured on server. Set DASHBOARD_PASSWORD env var." });
     }
-    if (typeof password !== "string" || password !== PASSWORD) {
-      console.log("[Dashboard] Login failed: wrong password from", req.ip);
-      return res.status(401).json({ error: "Incorrect password." });
+
+    const limit = checkRateLimit(clientIp);
+    if (!limit.allowed) {
+      console.warn("[Dashboard] Rate limit hit for IP:", clientIp);
+      return res.status(429).json({ error: "Too many attempts. Try again in 15 minutes." });
     }
+
+    const inputHash = hashPassword(password || "");
+    const expectedHash = PASSWORD.length === 64 ? PASSWORD : hashPassword(PASSWORD);
+
+    if (typeof password !== "string" || inputHash !== expectedHash) {
+      console.warn("[Dashboard] Login failed: wrong password from", clientIp, "remaining:", limit.remaining);
+      return res.status(401).json({ error: "Incorrect password. " + limit.remaining + " attempts remaining." });
+    }
+
+    console.log("[Dashboard] Login successful from", clientIp);
     const token = createSession();
     res.cookie(COOKIE_NAME, token, { httpOnly: true, sameSite: "lax", maxAge: 1000*60*60*24*7, path: "/" });
-    console.log("[Dashboard] Login successful from", req.ip);
     res.json({ ok: true });
   });
 
@@ -234,101 +271,13 @@ function startDashboard(client) {
     res.json({ ok: true, title: track.info.title });
   });
 
-  // ─── Spotify Recommendations ────────────────────────
-  app.get("/api/players/:guildId/recommendations", requireAuth, async (req, res) => {
-    const player = getPlayerOr404(client, res, req.params.guildId);
-    if (!player) return;
-    const current = player.queue?.current;
-    if (!current) return res.json({ tracks: [] });
-    try {
-      let recs = [];
-      if (current.info.sourceName === "spotify") {
-        const sid = extractSpotifyId(current.info.uri);
-        if (sid && process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
-          const spotifyTracks = await getSpotifyRecommendations(sid, 6);
-          recs = spotifyTracks.map(t => ({
-            title: t.name,
-            artist: t.artists?.map(a => a.name).join(", ") || "Unknown",
-            uri: `ytmsearch:${encodeURIComponent((t.artists?.[0]?.name || "") + " " + t.name)}`,
-            artwork: t.album?.images?.[0]?.url || null,
-          }));
-        }
-      }
-      res.json({ tracks: recs });
-    } catch (err) {
-      console.error("[Dashboard] Recommendations error:", err.message);
-      res.json({ tracks: [] });
-    }
-  });
-
-  // ─── Discovery / Featured (no player required) ────
-  app.get("/api/featured", requireAuth, async (req, res) => {
-    try {
-      let tracks = [];
-      // Try to get from any active player first
-      const players = [...client.lavalink.players.values()];
-      const active = players.find(p => p.playing && p.queue?.current);
-      if (active && active.queue.current.info.sourceName === "spotify") {
-        const sid = extractSpotifyId(active.queue.current.info.uri);
-        if (sid && process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
-          const spotifyTracks = await getSpotifyRecommendations(sid, 6);
-          tracks = spotifyTracks.map(t => ({
-            title: t.name,
-            artist: t.artists?.map(a => a.name).join(", ") || "Unknown",
-            uri: `ytmsearch:${encodeURIComponent((t.artists?.[0]?.name || "") + " " + t.name)}`,
-            artwork: t.album?.images?.[0]?.url || null,
-            durationFmt: "3:45",
-          }));
-        }
-      }
-      // Fallback static
-      if (!tracks.length) {
-        tracks = [
-          { title: "APT.", artist: "ROSÉ, Bruno Mars", artwork: null, uri: "ytmsearch:APT ROSÉ Bruno Mars", durationFmt: "2:53" },
-          { title: "Cool With You", artist: "NewJeans", artwork: null, uri: "ytmsearch:Cool With You NewJeans", durationFmt: "3:21" },
-          { title: "Ice Field", artist: "WYS", artwork: null, uri: "ytmsearch:Ice Field WYS", durationFmt: "2:45" },
-          { title: "BAND4BAND", artist: "Central Cee, Lil Baby", artwork: null, uri: "ytmsearch:BAND4BAND Central Cee Lil Baby", durationFmt: "2:20" },
-          { title: "Not Like Us", artist: "Kendrick Lamar", artwork: null, uri: "ytmsearch:Not Like Us Kendrick Lamar", durationFmt: "4:23" },
-          { title: "Espresso", artist: "Sabrina Carpenter", artwork: null, uri: "ytmsearch:Espresso Sabrina Carpenter", durationFmt: "2:55" },
-        ];
-      }
-      res.json({ tracks });
-    } catch (err) {
-      console.error("[Dashboard] Featured error:", err.message);
-      res.json({ tracks: [] });
-    }
-  });
-
-  app.get("/api/discover", requireAuth, async (req, res) => {
-    // Same as featured for now
-    try {
-      const node = client.lavalink.nodeManager.nodes.first();
-      if (node && node.connected) {
-        const result = await node.search({ query: "top hits 2024", source: "ytmsearch" }, { username: "Dashboard", tag: "Dashboard" }).catch(() => null);
-        if (result && result.tracks) {
-          const tracks = result.tracks.slice(0, 8).map(t => ({
-            title: t.info.title,
-            artist: t.info.author || "Unknown",
-            artwork: t.info.artworkUrl || (t.info.identifier ? `https://img.youtube.com/vi/${t.info.identifier}/mqdefault.jpg` : null),
-            uri: t.info.uri,
-            durationFmt: t.info.isStream ? "LIVE" : formatDuration(t.info.duration || 0),
-          }));
-          return res.json({ tracks });
-        }
-      }
-      res.json({ tracks: [] });
-    } catch (err) {
-      console.error("[Dashboard] Discover error:", err.message);
-      res.json({ tracks: [] });
-    }
-  });
-
   // ─── Last.fm Discovery ──────────────────────────────
   app.get("/api/lastfm/trending", requireAuth, async (req, res) => {
     try {
       const data = await lastfmFetch("chart.gettoptracks", { limit: "12" });
       const raw = data.tracks?.track || [];
-      const tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      tracks = await enrichTracksWithArtwork(client, tracks);
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] Last.fm trending error:", err.message);
@@ -341,7 +290,8 @@ function startDashboard(client) {
       const tag = req.params.tag;
       const data = await lastfmFetch("tag.gettoptracks", { tag, limit: "12" });
       const raw = data.tracks?.track || [];
-      const tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      tracks = await enrichTracksWithArtwork(client, tracks);
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] Last.fm genre error:", err.message);
@@ -355,7 +305,8 @@ function startDashboard(client) {
       if (!q) return res.status(400).json({ error: "q is required" });
       const data = await lastfmFetch("track.search", { track: q, limit: "12" });
       const raw = data.results?.trackmatches?.track || [];
-      const tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      tracks = await enrichTracksWithArtwork(client, tracks);
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] Last.fm search error:", err.message);
@@ -389,25 +340,6 @@ function startDashboard(client) {
   for (const evt of ["trackStart", "trackEnd", "playerCreate", "playerDestroy", "playerUpdate", "trackStuck", "trackError"]) {
     client.lavalink.on(evt, () => broadcast());
   }
-
-  // Push recommendations when track starts
-  client.lavalink.on("trackStart", async (player, track) => {
-    if (track?.info?.sourceName === "spotify" && io.engine.clientsCount > 0) {
-      try {
-        const sid = extractSpotifyId(track.info.uri);
-        if (sid && process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
-          const spotifyTracks = await getSpotifyRecommendations(sid, 6);
-          const recs = spotifyTracks.map(t => ({
-            title: t.name,
-            artist: t.artists?.map(a => a.name).join(", ") || "Unknown",
-            uri: `ytmsearch:${encodeURIComponent((t.artists?.[0]?.name || "") + " " + t.name)}`,
-            artwork: t.album?.images?.[0]?.url || null,
-          }));
-          io.emit("recommendations", { guildId: player.guildId, tracks: recs });
-        }
-      } catch (e) { console.error("[Dashboard] Rec push error:", e.message); }
-    }
-  });
 
   const PORT = process.env.PORT || process.env.DASHBOARD_PORT || 3000;
   server.listen(PORT, () => { console.log(`[Dashboard] Listening on port ${PORT}`); });
