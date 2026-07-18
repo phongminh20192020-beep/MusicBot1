@@ -72,6 +72,19 @@ function formatTime(ms) {
   return m + ":" + sec.toString().padStart(2, "0");
 }
 
+function stringToColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  const c = (hash & 0x00FFFFFF).toString(16).padStart(6, "0");
+  return "#" + c;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 function formatUptime(ms) {
   const s = Math.floor(ms / 1000);
   const d = Math.floor(s / 86400);
@@ -245,7 +258,17 @@ function renderGenres() {
   });
 }
 
+function showSkeletons() {
+  if (featuredGrid) {
+    featuredGrid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
+  }
+  if (discoverList) {
+    discoverList.innerHTML = Array(6).fill('<div class="skeleton-row"></div>').join('');
+  }
+}
+
 async function loadDiscovery() {
+  showSkeletons();
   try {
     const res = await apiFetch("/api/lastfm/trending");
     if (res.ok) {
@@ -254,26 +277,29 @@ async function loadDiscovery() {
       renderFeatured(tracks.slice(0, 3));
       renderDiscover(tracks);
     } else {
-      throw new Error("API error");
+      throw new Error("API error " + res.status);
     }
   } catch (e) {
     console.error("Last.fm load failed:", e);
-    toast("Last.fm not configured. Add LASTFM_API_KEY to env.", {type:"error"});
-    renderFeatured([]);
-    renderDiscover([]);
+    toast("Could not load Last.fm. Check LASTFM_API_KEY.", {type:"error"});
+    if (featuredGrid) featuredGrid.innerHTML = '<div class="discover-empty">Unable to load tracks</div>';
+    if (discoverList) discoverList.innerHTML = '<div class="discover-empty">Unable to load tracks</div>';
   }
 }
 
 function renderFeatured(tracks) {
   if (!featuredGrid) return;
-  if (!tracks.length) { featuredGrid.innerHTML = ''; return; }
-  featuredGrid.innerHTML = tracks.slice(0, 3).map(t =>
-    '<div class="featured-card" data-uri="' + (t.uri || '') + '">' +
-    '<img class="feat-bg" src="' + (t.artwork || FALLBACK_ART) + '" alt="" onerror="this.style.display=\'none\'">' +
+  if (!tracks.length) {
+    featuredGrid.innerHTML = '<div class="discover-empty">No featured tracks available</div>';
+    return;
+  }
+  featuredGrid.innerHTML = tracks.slice(0, 3).map((t, i) => {
+    const bg = t.artwork ? 'background-image:url(' + t.artwork + ')' : 'background:' + stringToColor(t.title + t.artist);
+    return '<div class="featured-card" data-uri="' + (t.uri || '') + '" style="' + bg + ';background-size:cover;background-position:center;">' +
     '<div class="feat-overlay"></div>' +
-    '<div class="feat-info"><div class="feat-title">' + t.title + '</div><div class="feat-artist">' + t.artist + '</div></div>' +
-    '</div>'
-  ).join('');
+    '<div class="feat-info"><div class="feat-title">' + escapeHtml(t.title) + '</div><div class="feat-artist">' + escapeHtml(t.artist) + '</div></div>' +
+    '</div>';
+  }).join('');
   featuredGrid.querySelectorAll('.featured-card').forEach(card => {
     card.addEventListener('click', () => playUri(card.dataset.uri, card.querySelector('.feat-title').textContent));
   });
@@ -281,17 +307,21 @@ function renderFeatured(tracks) {
 
 function renderDiscover(tracks) {
   if (!discoverList) return;
-  if (!tracks.length) { discoverList.innerHTML = ''; return; }
-  discoverList.innerHTML = tracks.map((t, i) =>
-    '<div class="discover-row" data-uri="' + (t.uri || '') + '">' +
-    '<img class="dr-art" src="' + (t.artwork || FALLBACK_ART) + '" alt="" onerror="this.style.display=\'none\'">' +
-    '<div class="dr-info"><div class="dr-title">' + t.title + '</div><div class="dr-artist">' + t.artist + '</div></div>' +
+  if (!tracks.length) {
+    discoverList.innerHTML = '<div class="discover-empty">No tracks found</div>';
+    return;
+  }
+  discoverList.innerHTML = tracks.map((t, i) => {
+    const artBg = t.artwork ? 'background-image:url(' + t.artwork + ')' : 'background:' + stringToColor(t.title + t.artist);
+    return '<div class="discover-row" data-uri="' + (t.uri || '') + '">' +
+    '<div class="dr-art" style="' + artBg + ';background-size:cover;background-position:center;"></div>' +
+    '<div class="dr-info"><div class="dr-title">' + escapeHtml(t.title) + '</div><div class="dr-artist">' + escapeHtml(t.artist) + '</div></div>' +
     '<div class="dr-actions">' +
     '<span class="dr-dur">' + (t.durationFmt || "3:45") + '</span>' +
     '<button class="dr-btn dr-like" title="Like">♡</button>' +
     '<button class="dr-btn dr-more" title="Add to queue">+</button>' +
-    '</div></div>'
-  ).join('');
+    '</div></div>';
+  }).join('');
   discoverList.querySelectorAll('.discover-row').forEach(row => {
     row.addEventListener('click', e => {
       if (e.target.closest('.dr-btn')) return;

@@ -2336,3 +2336,89 @@ input {
   text-align: center;
   padding: 16px;
 }
+
+
+/* ══════════════════════════════════════════════════════
+   LOADING SKELETONS
+════════════════════════════════════════════════════════ */
+
+.skeleton-card {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-lg);
+  aspect-ratio: 16 / 10;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+}
+
+.skeleton-row::before {
+  content: "";
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  flex-shrink: 0;
+}
+
+.skeleton-row::after {
+  content: "";
+  flex: 1;
+  height: 16px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.discover-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+/* ══════════════════════════════════════════════════════
+   GENRE CARDS (imageless, color-based)
+════════════════════════════════════════════════════════ */
+
+.genre-card {
+  flex: 0 0 auto;
+  width: 140px;
+  height: 180px;
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: flex-end;
+  padding: 12px;
+}
+
+.genre-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+}
+
+.genre-card .genre-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  z-index: 2;
+}

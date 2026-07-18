@@ -35,6 +35,27 @@ function lastfmTrackToJSON(track) {
   };
 }
 
+// ── Rate limiting ────────────────────────────────────
+const loginAttempts = new Map(); // ip -> { count, resetAt }
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+  }
+  entry.count++;
+  const remaining = Math.max(0, RATE_LIMIT_MAX - entry.count);
+  return { allowed: entry.count <= RATE_LIMIT_MAX, remaining };
+}
+
+function hashPassword(pw) {
+  return require("crypto").createHash("sha256").update(pw).digest("hex");
+}
+
 const VALID_LOOP_MODES = new Set(["off", "track", "queue"]);
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const searchCache = new Map();
