@@ -256,7 +256,10 @@ function renderGenres() {
       showSkeletons();
       try {
         const res = await apiFetch("/api/lastfm/genre/" + encodeURIComponent(card.dataset.tag));
-        if (!res.ok) throw new Error("Genre fetch failed: " + res.status);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "HTTP " + res.status);
+        }
         const data = await res.json();
         if (!data.tracks || !data.tracks.length) {
           toast("No tracks found for " + card.dataset.tag, {type:"error"});
@@ -268,9 +271,9 @@ function renderGenres() {
         renderDiscover(data.tracks);
         toast("Loaded " + card.dataset.tag + " tracks");
       } catch (e) {
-        toast("Could not load genre: " + e.message, {type:"error"});
-        renderFeatured([]);
-        renderDiscover([]);
+        toast("Genre error: " + e.message, {type:"error"});
+        if (featuredGrid) featuredGrid.innerHTML = '<div class="discover-empty">Error: ' + escapeHtml(e.message) + '</div>';
+        if (discoverList) discoverList.innerHTML = '';
       }
     });
   });
@@ -289,7 +292,10 @@ async function loadDiscovery() {
   showSkeletons();
   try {
     const res = await apiFetch("/api/lastfm/trending");
-    if (!res.ok) throw new Error("API error " + res.status);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "HTTP " + res.status);
+    }
     const data = await res.json();
     const tracks = data.tracks || [];
     if (!tracks.length) {
@@ -302,9 +308,9 @@ async function loadDiscovery() {
     renderDiscover(tracks);
   } catch (e) {
     console.error("Last.fm load failed:", e);
-    toast("Could not load Last.fm. Check LASTFM_API_KEY.", {type:"error"});
-    if (featuredGrid) featuredGrid.innerHTML = '<div class="discover-empty">Unable to load tracks</div>';
-    if (discoverList) discoverList.innerHTML = '<div class="discover-empty">Unable to load tracks</div>';
+    toast("Last.fm error: " + e.message, {type:"error"});
+    if (featuredGrid) featuredGrid.innerHTML = '<div class="discover-empty">Last.fm error: ' + escapeHtml(e.message) + '</div>';
+    if (discoverList) discoverList.innerHTML = '<div class="discover-empty">Check console or server logs for details</div>';
   }
 }
 
@@ -553,13 +559,20 @@ async function searchLastFm(query) {
   showSkeletons();
   try {
     const res = await apiFetch("/api/lastfm/search?q=" + encodeURIComponent(query));
-    if (!res.ok) throw new Error("Search failed: " + res.status);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "HTTP " + res.status);
+    }
     const data = await res.json();
     const tracks = data.tracks || [];
     if (!tracks.length) { toast("No results found", {type:"error"}); renderFeatured([]); renderDiscover([]); return; }
     renderFeatured(tracks.slice(0, 3));
     renderDiscover(tracks);
-  } catch (e) { toast("Search failed: " + e.message, {type:"error"}); }
+  } catch (e) {
+    toast("Search error: " + e.message, {type:"error"});
+    if (featuredGrid) featuredGrid.innerHTML = '<div class="discover-empty">Search error: ' + escapeHtml(e.message) + '</div>';
+    if (discoverList) discoverList.innerHTML = '';
+  }
 }
 
 globalSearchInput.addEventListener("input", () => {
