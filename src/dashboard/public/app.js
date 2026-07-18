@@ -22,7 +22,6 @@ const statLive      = $("#stat-live");
 const statUptime    = $("#stat-uptime");
 
 const bottomPlayer  = $("#bottom-player");
-const bpBody        = $("#bp-body");
 const bpArt         = $("#bp-art");
 const bpTitle       = $("#bp-title");
 const bpArtist      = $("#bp-artist");
@@ -40,27 +39,28 @@ const genresScroll  = $("#genres-scroll");
 const featuredGrid  = $("#featured-grid");
 const discoverList  = $("#discover-list");
 
-const FALLBACK_ART = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect width='100%25' height='100%25' fill='%231e1e24' rx='8'/%3E%3C/svg%3E";
-
 // ── State ────────────────────────────────────────────
 let socket = null;
 let currentPlayers = [];
 let activeGuildId = null;
 let currentView = "home";
 let marqueeCache = new Map();
+let imageCache = new Set();
 
-// ── Genre Data ─────────────────────────────────────
+// ── Genre Data (Last.fm tag names) ───────────────────
 const GENRES = [
-  { name: "Lofi",        color: "#6b8cae", query: "lofi hip hop radio" },
-  { name: "Phonk",       color: "#8b5a2b", query: "phonk music" },
-  { name: "Chillhop",    color: "#4a7c59", query: "chillhop beats" },
-  { name: "Britpop",     color: "#c4a35a", query: "britpop best" },
-  { name: "K-Pop",       color: "#e85d75", query: "kpop hits 2024" },
-  { name: "Pop",         color: "#8e7cc3", query: "pop hits 2024" },
-  { name: "Reggaeton",   color: "#d4a373", query: "reggaeton 2024" },
-  { name: "Rock",        color: "#7a3e3e", query: "rock classics" },
-  { name: "Electronic",  color: "#3d8b8b", query: "electronic dance" },
-  { name: "Jazz",        color: "#b8860b", query: "jazz classics" },
+  { name: "Lofi",        tag: "lofi" },
+  { name: "Phonk",       tag: "phonk" },
+  { name: "Chillhop",    tag: "chillhop" },
+  { name: "Britpop",     tag: "britpop" },
+  { name: "K-Pop",       tag: "k-pop" },
+  { name: "Pop",         tag: "pop" },
+  { name: "Reggaeton",   tag: "reggaeton" },
+  { name: "Rock",        tag: "rock" },
+  { name: "Electronic",  tag: "electronic" },
+  { name: "Jazz",        tag: "jazz" },
+  { name: "Hip-Hop",     tag: "hip-hop" },
+  { name: "R&B",         tag: "rnb" },
 ];
 
 // ── Helpers ────────────────────────────────────────
@@ -70,6 +70,16 @@ function formatTime(ms) {
   const m = Math.floor(s / 60);
   const sec = s % 60;
   return m + ":" + sec.toString().padStart(2, "0");
+}
+
+function formatUptime(ms) {
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return d + "d " + h + "h";
+  if (h > 0) return h + "h " + m + "m";
+  return m + "m";
 }
 
 function stringToColor(str) {
@@ -85,14 +95,15 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function formatUptime(ms) {
-  const s = Math.floor(ms / 1000);
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (d > 0) return d + "d " + h + "h";
-  if (h > 0) return h + "h " + m + "m";
-  return m + "m";
+function isValidImageUrl(url) {
+  return url && typeof url === "string" && url.trim().length > 10 && /^https?:\/\//.test(url);
+}
+
+function getArtworkStyle(track) {
+  if (isValidImageUrl(track.artwork)) {
+    return 'background-image:url(' + track.artwork + ');background-size:cover;background-position:center;';
+  }
+  return 'background:' + stringToColor(track.title + track.artist) + ';';
 }
 
 function toast(message, opts) {
@@ -238,21 +249,30 @@ navItems.forEach(item => {
 function renderGenres() {
   if (!genresScroll) return;
   genresScroll.innerHTML = GENRES.map(g =>
-    '<div class="genre-card" data-query="' + g.query + '" style="background:' + g.color + '">' +
+    '<div class="genre-card" data-tag="' + g.tag + '" style="background:' + stringToColor(g.name) + '">' +
     '<div class="genre-name">' + g.name + '</div>' +
     '</div>'
   ).join('');
   genresScroll.querySelectorAll('.genre-card').forEach(card => {
     card.addEventListener('click', async () => {
+      showSkeletons();
       try {
-        const res = await apiFetch("/api/lastfm/genre/" + encodeURIComponent(card.dataset.query));
-        if (!res.ok) throw new Error("Genre fetch failed");
+        const res = await apiFetch("/api/lastfm/genre/" + encodeURIComponent(card.dataset.tag));
+        if (!res.ok) throw new Error("Genre fetch failed: " + res.status);
         const data = await res.json();
+        if (!data.tracks || !data.tracks.length) {
+          toast("No tracks found for " + card.dataset.tag, {type:"error"});
+          renderFeatured([]);
+          renderDiscover([]);
+          return;
+        }
         renderFeatured(data.tracks.slice(0, 3));
         renderDiscover(data.tracks);
-        toast("Loaded " + card.dataset.query + " tracks");
+        toast("Loaded " + card.dataset.tag + " tracks");
       } catch (e) {
         toast("Could not load genre: " + e.message, {type:"error"});
+        renderFeatured([]);
+        renderDiscover([]);
       }
     });
   });
@@ -271,14 +291,17 @@ async function loadDiscovery() {
   showSkeletons();
   try {
     const res = await apiFetch("/api/lastfm/trending");
-    if (res.ok) {
-      const data = await res.json();
-      const tracks = data.tracks || [];
-      renderFeatured(tracks.slice(0, 3));
-      renderDiscover(tracks);
-    } else {
-      throw new Error("API error " + res.status);
+    if (!res.ok) throw new Error("API error " + res.status);
+    const data = await res.json();
+    const tracks = data.tracks || [];
+    if (!tracks.length) {
+      toast("No trending tracks found", {type:"error"});
+      renderFeatured([]);
+      renderDiscover([]);
+      return;
     }
+    renderFeatured(tracks.slice(0, 3));
+    renderDiscover(tracks);
   } catch (e) {
     console.error("Last.fm load failed:", e);
     toast("Could not load Last.fm. Check LASTFM_API_KEY.", {type:"error"});
@@ -294,8 +317,7 @@ function renderFeatured(tracks) {
     return;
   }
   featuredGrid.innerHTML = tracks.slice(0, 3).map((t, i) => {
-    const bg = t.artwork ? 'background-image:url(' + t.artwork + ')' : 'background:' + stringToColor(t.title + t.artist);
-    return '<div class="featured-card" data-uri="' + (t.uri || '') + '" style="' + bg + ';background-size:cover;background-position:center;">' +
+    return '<div class="featured-card" data-uri="' + (t.uri || '') + '" style="' + getArtworkStyle(t) + '">' +
     '<div class="feat-overlay"></div>' +
     '<div class="feat-info"><div class="feat-title">' + escapeHtml(t.title) + '</div><div class="feat-artist">' + escapeHtml(t.artist) + '</div></div>' +
     '</div>';
@@ -312,9 +334,8 @@ function renderDiscover(tracks) {
     return;
   }
   discoverList.innerHTML = tracks.map((t, i) => {
-    const artBg = t.artwork ? 'background-image:url(' + t.artwork + ')' : 'background:' + stringToColor(t.title + t.artist);
     return '<div class="discover-row" data-uri="' + (t.uri || '') + '">' +
-    '<div class="dr-art" style="' + artBg + ';background-size:cover;background-position:center;"></div>' +
+    '<div class="dr-art" style="' + getArtworkStyle(t) + '"></div>' +
     '<div class="dr-info"><div class="dr-title">' + escapeHtml(t.title) + '</div><div class="dr-artist">' + escapeHtml(t.artist) + '</div></div>' +
     '<div class="dr-actions">' +
     '<span class="dr-dur">' + (t.durationFmt || "3:45") + '</span>' +
@@ -334,10 +355,10 @@ function renderDiscover(tracks) {
 
 async function playUri(uri, title) {
   if (!activeGuildId) { toast("No active player. Use /play in Discord first.", {type:"error"}); return; }
-  if (!uri) return;
+  if (!uri) { toast("No playable link for this track", {type:"error"}); return; }
   try {
     const res = await apiFetch("/api/players/" + activeGuildId + "/queue", {
-      method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({uri: uri})
+      method: "POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({uri: uri})
     });
     if (!res.ok) { const data = await res.json().catch(()=>({})); toast(data.error || "Could not add track.", {type:"error"}); return; }
     toast("Added: " + title);
@@ -358,7 +379,7 @@ function renderQueueView() {
     html += '<div class="qv-header"><span class="qv-guild">' + (player.guildName || 'Unknown') + '</span>';
     html += '<span class="cc-badge ' + (player.playing && !player.paused ? 'badge-playing' : player.paused ? 'badge-paused' : 'badge-idle') + '">' + (player.playing && !player.paused ? 'On Air' : player.paused ? 'Paused' : 'Idle') + '</span></div>';
     if (track) {
-      html += '<div class="qv-now"><img src="' + (track.artwork || FALLBACK_ART) + '" class="qv-art" alt="">';
+      html += '<div class="qv-now"><img src="' + (isValidImageUrl(track.artwork) ? track.artwork : '') + '" class="qv-art" alt="" onerror="this.style.display=\'none\'">';
       html += '<div><div class="qv-title">' + track.title + '</div><div class="qv-author">' + track.author + '</div></div></div>';
     }
     const qTracks = player.queue || [];
@@ -432,7 +453,6 @@ function renderPlayers(players) {
   currentPlayers = players || [];
   const hasActive = players.some(p => p.playing || p.paused);
 
-  // Pick first active player for bottom bar
   const active = players.find(p => p.playing || p.paused) || players[0];
   if (active) {
     activeGuildId = active.guildId;
@@ -442,7 +462,6 @@ function renderPlayers(players) {
     collapseBottomPlayer();
   }
 
-  // Refresh current view
   if (currentView === 'queue') renderQueueView();
   if (currentView === 'history') renderHistoryView();
 }
@@ -453,7 +472,7 @@ function updateBottomPlayer(player) {
   const track = player.current;
 
   bottomPlayer.classList.remove('collapsed');
-  bpArt.src = track.artwork || FALLBACK_ART;
+  bpArt.src = isValidImageUrl(track.artwork) ? track.artwork : '';
   bpTitle.textContent = track.title || "Unknown";
   bpArtist.textContent = track.author || "Unknown artist";
   bpGuild.textContent = player.guildName || "Server";
@@ -476,7 +495,6 @@ function collapseBottomPlayer() {
   bpFill.style.width = "0%";
 }
 
-// Bottom player controls
 bpPlaypause.addEventListener('click', () => {
   if (!activeGuildId) return;
   const player = currentPlayers.find(p => p.guildId === activeGuildId);
@@ -495,7 +513,6 @@ bpVol.addEventListener('change', () => {
   sendCmd('volume', { level: Number(bpVol.value) });
 });
 
-// Click collapsed bar to expand (shows a message)
 bottomPlayer.addEventListener('click', e => {
   if (bottomPlayer.classList.contains('collapsed')) {
     toast("Use /play in Discord to start music");
@@ -522,24 +539,23 @@ function doGlobalSearch() {
   const query = globalSearchInput.value.trim();
   if (!query) return;
   switchView('home');
-  // If it's a URL, play directly
   if (/^https?:\/\//.test(query)) {
     if (!activeGuildId) { toast("No active player. Use /play in Discord first.", {type:"error"}); return; }
     playUri(query, query);
     return;
   }
-  // Otherwise search Last.fm and show results
   toast("Searching: " + query);
   searchLastFm(query);
 }
 
 async function searchLastFm(query) {
+  showSkeletons();
   try {
     const res = await apiFetch("/api/lastfm/search?q=" + encodeURIComponent(query));
-    if (!res.ok) throw new Error("Search failed");
+    if (!res.ok) throw new Error("Search failed: " + res.status);
     const data = await res.json();
     const tracks = data.tracks || [];
-    if (!tracks.length) { toast("No results found", {type:"error"}); return; }
+    if (!tracks.length) { toast("No results found", {type:"error"}); renderFeatured([]); renderDiscover([]); return; }
     renderFeatured(tracks.slice(0, 3));
     renderDiscover(tracks);
   } catch (e) { toast("Search failed: " + e.message, {type:"error"}); }

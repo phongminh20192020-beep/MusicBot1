@@ -21,15 +21,28 @@ async function lastfmFetch(method, extra) {
 }
 
 function lastfmTrackToJSON(track) {
-  const artist = typeof track.artist === "string" ? track.artist : (track.artist?.name || "Unknown");
-  const img = track.image || [];
-  const artwork = img.find(i => i.size === "extralarge")?.["#text"] || img.find(i => i.size === "large")?.["#text"] || null;
+  if (!track || typeof track !== "object") return null;
+  const artist = typeof track.artist === "string" ? track.artist : (track.artist?.name || track.artist?.["#text"] || "Unknown");
+  const img = Array.isArray(track.image) ? track.image : [];
+  let artwork = null;
+  for (const size of ["extralarge", "large", "medium", ""]) {
+    const found = img.find(i => i.size === size);
+    if (found && found["#text"] && found["#text"].trim().length > 10) {
+      artwork = found["#text"].trim();
+      break;
+    }
+  }
+  // If no image found, try to get from track URL or use null
+  if (!artwork && track.url) {
+    // Last.fm sometimes has no images for less popular tracks
+    artwork = null;
+  }
   return {
-    title: track.name,
+    title: track.name || "Unknown",
     artist: artist,
     artwork: artwork,
-    uri: "ytmsearch:" + encodeURIComponent(artist + " " + track.name),
-    durationFmt: track.duration ? formatDuration(Number(track.duration) * 1000) : "3:45",
+    uri: "ytmsearch:" + encodeURIComponent(artist + " " + (track.name || "")),
+    durationFmt: track.duration && !isNaN(Number(track.duration)) ? formatDuration(Number(track.duration) * 1000) : "3:45",
     listeners: Number(track.listeners || 0),
     playcount: Number(track.playcount || 0),
   };
@@ -314,7 +327,8 @@ function startDashboard(client) {
   app.get("/api/lastfm/trending", requireAuth, async (req, res) => {
     try {
       const data = await lastfmFetch("chart.gettoptracks", { limit: "12" });
-      const tracks = (data.tracks?.track || []).map(lastfmTrackToJSON);
+      const raw = data.tracks?.track || [];
+      const tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] Last.fm trending error:", err.message);
@@ -326,7 +340,8 @@ function startDashboard(client) {
     try {
       const tag = req.params.tag;
       const data = await lastfmFetch("tag.gettoptracks", { tag, limit: "12" });
-      const tracks = (data.tracks?.track || []).map(lastfmTrackToJSON);
+      const raw = data.tracks?.track || [];
+      const tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] Last.fm genre error:", err.message);
@@ -339,7 +354,8 @@ function startDashboard(client) {
       const q = (req.query.q || "").toString().trim();
       if (!q) return res.status(400).json({ error: "q is required" });
       const data = await lastfmFetch("track.search", { track: q, limit: "12" });
-      const tracks = (data.results?.trackmatches?.track || []).map(lastfmTrackToJSON);
+      const raw = data.results?.trackmatches?.track || [];
+      const tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] Last.fm search error:", err.message);
