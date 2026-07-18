@@ -9,6 +9,7 @@ const { Server } = require("socket.io");
 const { COOKIE_NAME, createSession, destroySession, requireAuth, isValidFromHeader, parseCookies, isValid } = require("./auth");
 const { statsToJSON, playerToJSON } = require("./state");
 const { formatDuration, resolveSpotify, getSpotifyRecommendations, extractSpotifyId } = require("../utils/helpers");
+const { PENALTY_WORDS, BONUS_WORDS } = require("./public/keywords");
 
 const VALID_LOOP_MODES = new Set(["off", "track", "queue"]);
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -65,6 +66,94 @@ function sanitizeSearchQuery(q) {
     .replace(/\s+by\s+/gi, " ")       // "Song by Artist" → "Song Artist"
     .replace(/\s+/g, " ")             // collapse spaces
     .trim();
+}
+
+// ── String normalizer for fuzzy matching ─────────────
+// Strips diacritics, parens, brackets, punctuation
+function norm(s) {
+  return String(s || "")
+    .normalize("NFD")                  // decompose accents: é → e + ◌́
+    .replace(/[\u0300-\u036f]/g, "") // strip combining diacritical marks
+    .toLowerCase()
+    .replace(/\(.*?\)/g, " ")       // remove (anything in parens)
+    .replace(/\[.*?\]/g, " ")       // remove [anything in brackets]
+    .replace(/[^\w\s]/g, " ")       // remove punctuation
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// ── Fuzzy track scorer ───────────────────────────────
+// Returns 0.0–1.0 score of how well a track matches a query
+function scoreTrack(track, rawQuery) {
+  const qNorm = norm(rawQuery);
+  const qWords = qNorm.split(/\s+/).filter(w => w.length > 2);
+  if (!qWords.length) return 1;
+
+  const titleNorm  = norm(track.info?.title);
+  const authorNorm = norm(track.info?.author);
+
+  // ── 1. Title exact match ──
+  const titleMatched = qWords.filter(w => titleNorm.includes(w)).length;
+  const titleExact   = qWords.length > 0 ? titleMatched / qWords.length : 1;
+
+  // ── 2. Author exact match ──
+  const authorMatched = qWords.filter(w => authorNorm.includes(w)).length;
+  const authorExact   = qWords.length > 0 ? authorMatched / qWords.length : 1;
+
+  // ── 3. Combined exact ──
+  const combined      = titleNorm + " " + authorNorm;
+  const combinedMatched = qWords.filter(w => combined.includes(w)).length;
+  const combinedExact = qWords.length > 0 ? combinedMatched / qWords.length : 1;
+
+  // ── 4. Title fuzzy ──
+  const titleWords = titleNorm.split(/\s+/).filter(w => w.length > 2);
+  let titleFuzzyMatches = 0;
+  for (const qw of qWords) {
+    for (const tw of titleWords) {
+      if (tw.includes(qw) || qw.includes(tw)) { titleFuzzyMatches++; break; }
+    }
+  }
+  const titleFuzzy = qWords.length > 0 ? titleFuzzyMatches / qWords.length : 1;
+
+  // ── 5. Author fuzzy ──
+  const authorWords = authorNorm.split(/\s+/).filter(w => w.length > 2);
+  let authorFuzzyMatches = 0;
+  for (const qw of qWords) {
+    for (const tw of authorWords) {
+      if (tw.includes(qw) || qw.includes(tw)) { authorFuzzyMatches++; break; }
+    }
+  }
+  const authorFuzzy = qWords.length > 0 ? authorFuzzyMatches / qWords.length : 1;
+
+  // ── 6. VERSION PENALTY / BONUS ──
+  // Uses PENALTY_WORDS / BONUS_WORDS from ./public/keywords.js
+  const tLower = titleNorm;
+  let penalty = 0;
+  let bonus = 0;
+  for (const p of PENALTY_WORDS) if (tLower.includes(p)) penalty += 0.12;
+  for (const b of BONUS_WORDS)   if (tLower.includes(b)) bonus += 0.08;
+  const versionMod = Math.max(-0.25, Math.min(0.25, bonus - penalty));
+
+  // Weighted blend
+  const baseScore = titleExact * 0.30 + authorExact * 0.30 + combinedExact * 0.20 + titleFuzzy * 0.10 + authorFuzzy * 0.10;
+  const score = Math.max(0, Math.min(1, baseScore + versionMod));
+
+  console.log(`    scoreTrack: "${track.info?.title}" by "${track.info?.author}" | base=${(baseScore*100).toFixed(1)}% versionMod=${(versionMod>=0?"+":"")}${(versionMod*100).toFixed(0)}% → total=${(score*100).toFixed(1)}%`);
+
+  return score;
+}
+
+// ── Reorder tracks by relevance ──────────────────────
+function sortByRelevance(tracks, rawQuery) {
+  if (!tracks?.length || !rawQuery) return tracks;
+  const scored = tracks.map(t => ({ track: t, score: scoreTrack(t, rawQuery) }));
+  scored.sort((a, b) => b.score - a.score);
+  // Log what we did
+  console.log(`[Dashboard] Reordered ${scored.length} results by relevance:`);
+  scored.slice(0, 3).forEach((s, i) => {
+    console.log(`  [${i}] "${s.track.info?.title}" by "${s.track.info?.author}" — score ${(s.score*100).toFixed(1)}%`);
+  });
+  return scored.map(s => s.track);
 }
 
 function lastfmTrackToJSON(track) {
@@ -291,7 +380,9 @@ function startDashboard(client) {
         console.log(`  [${i}] "${t.info?.title}" by "${t.info?.author}" | ${t.info?.uri}`);
       });
 
-      res.json({ results: tracks.slice(0, 8).map(t => trackToSearchJSON(req.params.guildId, t)) });
+      // Reorder by relevance so best match appears first
+      const reordered = sortByRelevance(tracks, query);
+      res.json({ results: reordered.slice(0, 8).map(t => trackToSearchJSON(req.params.guildId, t)) });
     } catch (err) {
       console.error("[Dashboard] Search error:", err.message);
       res.status(500).json({ error: "Search failed." });
@@ -323,30 +414,14 @@ function startDashboard(client) {
       });
 
       if (r?.tracks?.length) {
-        // Validate top result isn't completely unrelated
-        const top = r.tracks[0];
-        const qWords = cleanUri.toLowerCase().replace(/^ytmsearch:/, "").split(/\s+/).filter(w => w.length > 2);
-        const titleWords = (top.info?.title + " " + (top.info?.author || "")).toLowerCase();
-        const matchCount = qWords.filter(w => titleWords.includes(w)).length;
-        const matchRatio = qWords.length > 0 ? matchCount / qWords.length : 1;
+        const rawQuery = cleanUri.toLowerCase().replace(/^ytmsearch:/, "").trim();
+        const reordered = sortByRelevance(r.tracks, rawQuery);
+        track = reordered[0];
 
-        console.log(`[Dashboard] Top result: "${top.info?.title}" by "${top.info?.author}" (match ${Math.round(matchRatio*100)}%)`);
-
-        if (matchRatio < 0.2 && r.tracks.length > 1) {
-          // Try to find a better match
-          const better = r.tracks.find(t => {
-            const tw = (t.info?.title + " " + (t.info?.author || "")).toLowerCase();
-            const mc = qWords.filter(w => tw.includes(w)).length;
-            return (qWords.length > 0 ? mc / qWords.length : 1) >= 0.3;
-          });
-          if (better) {
-            console.log(`[Dashboard] Switched to better match: "${better.info?.title}"`);
-            track = better;
-          } else {
-            track = top;
-          }
-        } else {
-          track = top;
+        // If top result is still weak, warn but still use it
+        const topScore = scoreTrack(track, rawQuery);
+        if (topScore < 0.25) {
+          console.warn(`[Dashboard] WARNING: Best match score only ${(topScore*100).toFixed(1)}% for "${rawQuery}" — result may be wrong.`);
         }
       } else {
         console.warn("[Dashboard] Search returned no results for URI:", cleanUri);
