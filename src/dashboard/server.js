@@ -50,6 +50,7 @@ function getPlayerOr404(client, res, guildId) {
 
 function startDashboard(client) {
   const app    = express();
+  app.set('trust proxy', 1);
   const server = http.createServer(app);
   const io     = new Server(server, { cors: { origin: false } });
 
@@ -65,11 +66,19 @@ function startDashboard(client) {
   });
 
   app.post("/api/login", (req, res) => {
+    console.log("[Dashboard] Login attempt from", req.ip);
     const { password } = req.body || {};
-    if (!PASSWORD) return res.status(503).json({ error: "Dashboard password not configured." });
-    if (typeof password !== "string" || password !== PASSWORD) return res.status(401).json({ error: "Incorrect password." });
+    if (!PASSWORD) {
+      console.warn("[Dashboard] Login rejected: DASHBOARD_PASSWORD not set");
+      return res.status(503).json({ error: "Dashboard password not configured on server. Set DASHBOARD_PASSWORD env var." });
+    }
+    if (typeof password !== "string" || password !== PASSWORD) {
+      console.log("[Dashboard] Login failed: wrong password from", req.ip);
+      return res.status(401).json({ error: "Incorrect password." });
+    }
     const token = createSession();
     res.cookie(COOKIE_NAME, token, { httpOnly: true, sameSite: "lax", maxAge: 1000*60*60*24*7, path: "/" });
+    console.log("[Dashboard] Login successful from", req.ip);
     res.json({ ok: true });
   });
 
