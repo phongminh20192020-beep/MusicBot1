@@ -9,7 +9,7 @@ const { Server } = require("socket.io");
 const { COOKIE_NAME, createSession, destroySession, requireAuth, isValidFromHeader, parseCookies, isValid } = require("./auth");
 const { statsToJSON, playerToJSON } = require("./state");
 const { formatDuration, resolveSpotify, getSpotifyRecommendations, extractSpotifyId } = require("../utils/helpers");
-const { PENALTY_WORDS, BONUS_WORDS } = require("./public/keywords");
+const { PENALTY_WORDS, TIER1_BONUS, TIER2_BONUS, TIER3_BONUS } = require("./public/keywords");
 
 const VALID_LOOP_MODES = new Set(["off", "track", "queue"]);
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -126,13 +126,19 @@ function scoreTrack(track, rawQuery) {
   const authorFuzzy = qWords.length > 0 ? authorFuzzyMatches / qWords.length : 1;
 
   // ── 6. VERSION PENALTY / BONUS ──
-  // Uses PENALTY_WORDS / BONUS_WORDS from ./public/keywords.js
+  // Uses keywords from ./public/keywords.js
+  // Tier 1 (official mv, official music video): +20% each
+  // Tier 2 (official, original, mv): +12% each
+  // Tier 3 (music video, audio, studio, etc): +6% each
+  // Penalty (remix, cover, acoustic, etc): -12% each
   const tLower = titleNorm;
   let penalty = 0;
   let bonus = 0;
   for (const p of PENALTY_WORDS) if (tLower.includes(p)) penalty += 0.12;
-  for (const b of BONUS_WORDS)   if (tLower.includes(b)) bonus += 0.08;
-  const versionMod = Math.max(-0.25, Math.min(0.25, bonus - penalty));
+  for (const b of TIER1_BONUS)   if (tLower.includes(b)) bonus += 0.20;
+  for (const b of TIER2_BONUS)   if (tLower.includes(b)) bonus += 0.12;
+  for (const b of TIER3_BONUS)   if (tLower.includes(b)) bonus += 0.06;
+  const versionMod = Math.max(-0.30, Math.min(0.40, bonus - penalty));
 
   // Weighted blend
   const baseScore = titleExact * 0.30 + authorExact * 0.30 + combinedExact * 0.20 + titleFuzzy * 0.10 + authorFuzzy * 0.10;
