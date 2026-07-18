@@ -230,37 +230,37 @@ function renderGenres() {
     '</div>'
   ).join('');
   genresScroll.querySelectorAll('.genre-card').forEach(card => {
-    card.addEventListener('click', () => {
-      if (!activeGuildId) { toast("No active player. Use /play in Discord first.", {type:"error"}); return; }
-      globalSearchInput.value = card.dataset.query;
-      doGlobalSearch();
+    card.addEventListener('click', async () => {
+      try {
+        const res = await apiFetch("/api/lastfm/genre/" + encodeURIComponent(card.dataset.query));
+        if (!res.ok) throw new Error("Genre fetch failed");
+        const data = await res.json();
+        renderFeatured(data.tracks.slice(0, 3));
+        renderDiscover(data.tracks);
+        toast("Loaded " + card.dataset.query + " tracks");
+      } catch (e) {
+        toast("Could not load genre: " + e.message, {type:"error"});
+      }
     });
   });
 }
 
 async function loadDiscovery() {
   try {
-    // Try to load featured from API
-    const res = await apiFetch("/api/featured");
+    const res = await apiFetch("/api/lastfm/trending");
     if (res.ok) {
       const data = await res.json();
-      renderFeatured(data.tracks || []);
-      renderDiscover(data.tracks || []);
+      const tracks = data.tracks || [];
+      renderFeatured(tracks.slice(0, 3));
+      renderDiscover(tracks);
     } else {
       throw new Error("API error");
     }
   } catch (e) {
-    // Fallback static data
-    const staticTracks = [
-      { title: "APT.", artist: "ROSÉ, Bruno Mars", artwork: "https://i.scdn.co/image/ab67616d0000b273c1b0d9a5d8e7f8e9f0a1b2c3", uri: "ytmsearch:APT ROSÉ Bruno Mars" },
-      { title: "Cool With You", artist: "NewJeans", artwork: "https://i.scdn.co/image/ab67616d0000b273d2e9a5d8e7f8e9f0a1b2c3d4", uri: "ytmsearch:Cool With You NewJeans" },
-      { title: "Ice Field", artist: "WYS", artwork: "https://i.scdn.co/image/ab67616d0000b273e3f0a5d8e7f8e9f0a1b2c3d5", uri: "ytmsearch:Ice Field WYS" },
-      { title: "BAND4BAND", artist: "Central Cee, Lil Baby", artwork: "https://i.scdn.co/image/ab67616d0000b273f4f0a5d8e7f8e9f0a1b2c3d6", uri: "ytmsearch:BAND4BAND Central Cee Lil Baby" },
-      { title: "Not Like Us", artist: "Kendrick Lamar", artwork: "https://i.scdn.co/image/ab67616d0000b273a5f0a5d8e7f8e9f0a1b2c3d7", uri: "ytmsearch:Not Like Us Kendrick Lamar" },
-      { title: "Espresso", artist: "Sabrina Carpenter", artwork: "https://i.scdn.co/image/ab67616d0000b273b6f0a5d8e7f8e9f0a1b2c3d8", uri: "ytmsearch:Espresso Sabrina Carpenter" },
-    ];
-    renderFeatured(staticTracks.slice(0, 3));
-    renderDiscover(staticTracks);
+    console.error("Last.fm load failed:", e);
+    toast("Last.fm not configured. Add LASTFM_API_KEY to env.", {type:"error"});
+    renderFeatured([]);
+    renderDiscover([]);
   }
 }
 
@@ -490,30 +490,29 @@ let globalDebounce = null;
 
 function doGlobalSearch() {
   const query = globalSearchInput.value.trim();
-  if (!query || !activeGuildId) return;
-  // Switch to home and show search results overlay
+  if (!query) return;
   switchView('home');
-  // For now, just add to queue directly if it's a URL
+  // If it's a URL, play directly
   if (/^https?:\/\//.test(query)) {
+    if (!activeGuildId) { toast("No active player. Use /play in Discord first.", {type:"error"}); return; }
     playUri(query, query);
-  } else {
-    // Search and show results in a toast/overlay
-    toast("Searching: " + query);
-    searchAndShow(query);
+    return;
   }
+  // Otherwise search Last.fm and show results
+  toast("Searching: " + query);
+  searchLastFm(query);
 }
 
-async function searchAndShow(query) {
+async function searchLastFm(query) {
   try {
-    const res = await apiFetch("/api/players/" + activeGuildId + "/search?query=" + encodeURIComponent(query));
-    if (!res.ok) return;
+    const res = await apiFetch("/api/lastfm/search?q=" + encodeURIComponent(query));
+    if (!res.ok) throw new Error("Search failed");
     const data = await res.json();
-    const tracks = data.results || [];
+    const tracks = data.tracks || [];
     if (!tracks.length) { toast("No results found", {type:"error"}); return; }
-    // Show first result as featured, rest as discover
     renderFeatured(tracks.slice(0, 3));
     renderDiscover(tracks);
-  } catch (e) { toast("Search failed", {type:"error"}); }
+  } catch (e) { toast("Search failed: " + e.message, {type:"error"}); }
 }
 
 globalSearchInput.addEventListener("input", () => {

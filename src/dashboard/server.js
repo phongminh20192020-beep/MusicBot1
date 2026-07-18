@@ -10,6 +10,31 @@ const { COOKIE_NAME, createSession, destroySession, requireAuth, isValidFromHead
 const { statsToJSON, playerToJSON } = require("./state");
 const { formatDuration, resolveSpotify, getSpotifyRecommendations, extractSpotifyId } = require("../utils/helpers");
 
+const LASTFM_KEY = process.env.LASTFM_API_KEY;
+
+async function lastfmFetch(method, extra) {
+  if (!LASTFM_KEY) throw new Error("LASTFM_API_KEY not configured");
+  const params = new URLSearchParams({ method, api_key: LASTFM_KEY, format: "json", ...extra });
+  const res = await fetch("https://ws.audioscrobbler.com/2.0/?" + params.toString());
+  if (!res.ok) throw new Error("Last.fm API error: " + res.status);
+  return res.json();
+}
+
+function lastfmTrackToJSON(track) {
+  const artist = typeof track.artist === "string" ? track.artist : (track.artist?.name || "Unknown");
+  const img = track.image || [];
+  const artwork = img.find(i => i.size === "extralarge")?.["#text"] || img.find(i => i.size === "large")?.["#text"] || null;
+  return {
+    title: track.name,
+    artist: artist,
+    artwork: artwork,
+    uri: "ytmsearch:" + encodeURIComponent(artist + " " + track.name),
+    durationFmt: track.duration ? formatDuration(Number(track.duration) * 1000) : "3:45",
+    listeners: Number(track.listeners || 0),
+    playcount: Number(track.playcount || 0),
+  };
+}
+
 const VALID_LOOP_MODES = new Set(["off", "track", "queue"]);
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const searchCache = new Map();
@@ -261,6 +286,43 @@ function startDashboard(client) {
     } catch (err) {
       console.error("[Dashboard] Discover error:", err.message);
       res.json({ tracks: [] });
+    }
+  });
+
+  // ─── Last.fm Discovery ──────────────────────────────
+  app.get("/api/lastfm/trending", requireAuth, async (req, res) => {
+    try {
+      const data = await lastfmFetch("chart.gettoptracks", { limit: "12" });
+      const tracks = (data.tracks?.track || []).map(lastfmTrackToJSON);
+      res.json({ tracks });
+    } catch (err) {
+      console.error("[Dashboard] Last.fm trending error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/lastfm/genre/:tag", requireAuth, async (req, res) => {
+    try {
+      const tag = req.params.tag;
+      const data = await lastfmFetch("tag.gettoptracks", { tag, limit: "12" });
+      const tracks = (data.tracks?.track || []).map(lastfmTrackToJSON);
+      res.json({ tracks });
+    } catch (err) {
+      console.error("[Dashboard] Last.fm genre error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/lastfm/search", requireAuth, async (req, res) => {
+    try {
+      const q = (req.query.q || "").toString().trim();
+      if (!q) return res.status(400).json({ error: "q is required" });
+      const data = await lastfmFetch("track.search", { track: q, limit: "12" });
+      const tracks = (data.results?.trackmatches?.track || []).map(lastfmTrackToJSON);
+      res.json({ tracks });
+    } catch (err) {
+      console.error("[Dashboard] Last.fm search error:", err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 
