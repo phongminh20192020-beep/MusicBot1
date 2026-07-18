@@ -58,6 +58,15 @@ async function lastfmFetch(method, extra) {
   return data;
 }
 
+// ── Query sanitizer ──────────────────────────────────
+function sanitizeSearchQuery(q) {
+  return q
+    .replace(/\s*-\s*by\s+/gi, " ")   // "Song - by Artist" → "Song Artist"
+    .replace(/\s+by\s+/gi, " ")       // "Song by Artist" → "Song Artist"
+    .replace(/\s+/g, " ")             // collapse spaces
+    .trim();
+}
+
 function lastfmTrackToJSON(track) {
   if (!track || typeof track !== "object") return null;
   const artist = typeof track.artist === "string" ? track.artist : (track.artist?.name || track.artist?.["#text"] || "Unknown");
@@ -70,12 +79,15 @@ function lastfmTrackToJSON(track) {
       break;
     }
   }
-  // If no image from Last.fm, leave null so enrichTracksWithArtwork can fill it
+  // Build clean ytmsearch query — NO encodeURIComponent here (lavalink-client handles it)
+  const rawQuery = (artist + " " + (track.name || "")).trim();
+  const cleanQuery = sanitizeSearchQuery(rawQuery);
+
   return {
     title: track.name || "Unknown",
     artist: artist,
     artwork: artwork,
-    uri: "ytmsearch:" + encodeURIComponent(artist + " " + (track.name || "")),
+    uri: "ytmsearch:" + cleanQuery,
     durationFmt: track.duration && !isNaN(Number(track.duration)) ? formatDuration(Number(track.duration) * 1000) : "3:45",
     listeners: Number(track.listeners || 0),
     playcount: Number(track.playcount || 0),
@@ -226,9 +238,9 @@ function startDashboard(client) {
 
   app.post("/api/players/:guildId/loop", requireAuth, async (req, res) => {
     const p = getPlayerOr404(client, res, req.params.guildId); if (!p) return;
-    const mode = req.body?.mode;
+    const mode = String(req.body?.mode || "").toLowerCase();
     if (!VALID_LOOP_MODES.has(mode)) return res.status(400).json({ error: "mode must be off, track, or queue." });
-    await p.setRepeatMode(mode); res.json({ ok: true });
+    await p.setRepeatMode(mode); res.json({ ok: true, mode });
   });
 
   app.post("/api/players/:guildId/shuffle", requireAuth, async (req, res) => {
@@ -241,9 +253,13 @@ function startDashboard(client) {
   app.get("/api/players/:guildId/search", requireAuth, async (req, res) => {
     const player = getPlayerOr404(client, res, req.params.guildId);
     if (!player) return;
-    const query = (req.query.query || "").toString().trim();
-    if (!query) return res.status(400).json({ error: "query is required." });
+    const rawQuery = (req.query.query || "").toString().trim();
+    if (!rawQuery) return res.status(400).json({ error: "query is required." });
     const requester = { username: "Dashboard", tag: "Dashboard" };
+
+    // Sanitize query before searching
+    const query = sanitizeSearchQuery(rawQuery);
+    console.log(`[Dashboard] Search raw: "${rawQuery}" | sanitized: "${query}"`);
 
     try {
       const isSpotify = /spotify\.com\/(track|playlist|album)\//.test(query);
@@ -269,6 +285,12 @@ function startDashboard(client) {
         const result = await player.search(isUrl ? { query } : { query, source: "ytmsearch" }, requester).catch(() => null);
         if (result && result.loadType !== "empty" && result.loadType !== "error") tracks = result.tracks || [];
       }
+
+      console.log(`[Dashboard] Search returned ${tracks.length} results for "${query}"`);
+      tracks.slice(0, 3).forEach((t, i) => {
+        console.log(`  [${i}] "${t.info?.title}" by "${t.info?.author}" | ${t.info?.uri}`);
+      });
+
       res.json({ results: tracks.slice(0, 8).map(t => trackToSearchJSON(req.params.guildId, t)) });
     } catch (err) {
       console.error("[Dashboard] Search error:", err.message);
@@ -280,16 +302,63 @@ function startDashboard(client) {
     const player = getPlayerOr404(client, res, req.params.guildId);
     if (!player) return;
     const token = req.body?.token;
-    const uri   = req.body?.uri;
+    let uri     = req.body?.uri;
     let track = null;
-    if (typeof token === "string") track = takeSearchResult(req.params.guildId, token);
-    if (!track && typeof uri === "string") {
-      const r = await player.search({ query: uri }, { username: "Dashboard", tag: "Dashboard" }).catch(() => null);
-      if (r?.tracks?.[0]) track = r.tracks[0];
+
+    // Try cached token first
+    if (typeof token === "string") {
+      track = takeSearchResult(req.params.guildId, token);
+      if (track) console.log("[Dashboard] Queue from token cache:", track.info?.title);
     }
+
+    // Fallback: search by URI
+    if (!track && typeof uri === "string") {
+      // Sanitize the URI/query before searching
+      const cleanUri = sanitizeSearchQuery(uri);
+      console.log("[Dashboard] Queue search URI:", cleanUri);
+
+      const r = await player.search({ query: cleanUri }, { username: "Dashboard", tag: "Dashboard" }).catch((e) => {
+        console.error("[Dashboard] Queue search error:", e.message);
+        return null;
+      });
+
+      if (r?.tracks?.length) {
+        // Validate top result isn't completely unrelated
+        const top = r.tracks[0];
+        const qWords = cleanUri.toLowerCase().replace(/^ytmsearch:/, "").split(/\s+/).filter(w => w.length > 2);
+        const titleWords = (top.info?.title + " " + (top.info?.author || "")).toLowerCase();
+        const matchCount = qWords.filter(w => titleWords.includes(w)).length;
+        const matchRatio = qWords.length > 0 ? matchCount / qWords.length : 1;
+
+        console.log(`[Dashboard] Top result: "${top.info?.title}" by "${top.info?.author}" (match ${Math.round(matchRatio*100)}%)`);
+
+        if (matchRatio < 0.2 && r.tracks.length > 1) {
+          // Try to find a better match
+          const better = r.tracks.find(t => {
+            const tw = (t.info?.title + " " + (t.info?.author || "")).toLowerCase();
+            const mc = qWords.filter(w => tw.includes(w)).length;
+            return (qWords.length > 0 ? mc / qWords.length : 1) >= 0.3;
+          });
+          if (better) {
+            console.log(`[Dashboard] Switched to better match: "${better.info?.title}"`);
+            track = better;
+          } else {
+            track = top;
+          }
+        } else {
+          track = top;
+        }
+      } else {
+        console.warn("[Dashboard] Search returned no results for URI:", cleanUri);
+      }
+    }
+
     if (!track) return res.status(400).json({ error: "Track not found or expired." });
+
     player.queue.add(track);
-    if (!player.playing && !player.paused) await player.play().catch(err => console.error("[Dashboard] play() error:", err.message));
+    if (!player.playing && !player.paused) {
+      await player.play().catch(err => console.error("[Dashboard] play() error:", err.message));
+    }
     res.json({ ok: true, title: track.info.title });
   });
 
