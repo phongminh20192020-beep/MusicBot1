@@ -44,8 +44,6 @@ let socket = null;
 let currentPlayers = [];
 let activeGuildId = null;
 let currentView = "home";
-let marqueeCache = new Map();
-let imageCache = new Set();
 
 // ── Genre Data (Last.fm tag names) ───────────────────
 const GENRES = [
@@ -379,7 +377,7 @@ function renderQueueView() {
     html += '<div class="qv-header"><span class="qv-guild">' + (player.guildName || 'Unknown') + '</span>';
     html += '<span class="cc-badge ' + (player.playing && !player.paused ? 'badge-playing' : player.paused ? 'badge-paused' : 'badge-idle') + '">' + (player.playing && !player.paused ? 'On Air' : player.paused ? 'Paused' : 'Idle') + '</span></div>';
     if (track) {
-      html += '<div class="qv-now"><img src="' + (isValidImageUrl(track.artwork) ? track.artwork : '') + '" class="qv-art" alt="" onerror="this.style.display=\'none\'">';
+      html += '<div class="qv-now"><div class="qv-art" style="' + getArtworkStyle(track) + '"></div>';
       html += '<div><div class="qv-title">' + track.title + '</div><div class="qv-author">' + track.author + '</div></div></div>';
     }
     const qTracks = player.queue || [];
@@ -473,6 +471,9 @@ function updateBottomPlayer(player) {
 
   bottomPlayer.classList.remove('collapsed');
   bpArt.src = isValidImageUrl(track.artwork) ? track.artwork : '';
+  bpArt.style.opacity = '0';
+  bpArt.onload = function() { this.style.opacity = '1'; };
+  bpArt.onerror = function() { this.style.display = 'none'; };
   bpTitle.textContent = track.title || "Unknown";
   bpArtist.textContent = track.author || "Unknown artist";
   bpGuild.textContent = player.guildName || "Server";
