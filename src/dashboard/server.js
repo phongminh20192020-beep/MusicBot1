@@ -447,7 +447,7 @@ function startDashboard(client) {
   app.get("/api/lastfm/trending", requireAuth, async (req, res) => {
     try {
       console.log("[Dashboard] Fetching Last.fm trending...");
-      const data = await lastfmFetch("chart.gettoptracks", { limit: "12" });
+      const data = await lastfmFetch("chart.gettoptracks", { limit: "24" });
       const raw = data.tracks?.track || [];
       console.log("[Dashboard] Last.fm returned", raw.length, "tracks");
       let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
@@ -461,16 +461,21 @@ function startDashboard(client) {
     }
   });
 
-  app.get("/api/lastfm/genre/:tag", requireAuth, async (req, res) => {
+  app.get("/api/lastfm/tag", requireAuth, async (req, res) => {
     try {
-      const tag = req.params.tag;
-      const data = await lastfmFetch("tag.gettoptracks", { tag, limit: "12" });
+      const tag = (req.query.tag || "").toString().trim();
+      if (!tag) return res.status(400).json({ error: "tag is required" });
+      console.log("[Dashboard] Fetching Last.fm tag:", tag);
+      const data = await lastfmFetch("tag.gettoptracks", { tag, limit: "30" });
       const raw = data.tracks?.track || [];
+      console.log("[Dashboard] Last.fm tag returned", raw.length, "tracks");
       let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      console.log("[Dashboard] Parsed", tracks.length, "valid tracks");
       tracks = await enrichTracksWithArtwork(client, tracks);
+      console.log("[Dashboard] Enriched", tracks.length, "tracks with artwork");
       res.json({ tracks });
     } catch (err) {
-      console.error("[Dashboard] Last.fm genre error:", err.message);
+      console.error("[Dashboard] Last.fm tag error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
