@@ -6,6 +6,8 @@ const crypto  = require("crypto");
 const express = require("express");
 const { Server } = require("socket.io");
 
+const { exec } = require("child_process");
+const { promisify } = require("util");
 const { COOKIE_NAME, createSession, destroySession, requireAuth, isValidFromHeader, parseCookies, isValid } = require("./auth");
 const { statsToJSON, playerToJSON } = require("./state");
 const { formatDuration, resolveSpotify, getSpotifyRecommendations, extractSpotifyId } = require("../utils/helpers");
@@ -34,6 +36,57 @@ function checkRateLimit(ip) {
 
 function hashPassword(pw) {
   return crypto.createHash("sha256").update(pw).digest("hex");
+}
+
+const execAsync = promisify(exec);
+
+// ── yt-dlp thumbnail fetcher ─────────────────────────
+// Uses yt-dlp to extract the highest-resolution thumbnail URL
+// without downloading the video. Falls back gracefully if yt-dlp
+// is not installed or the video is unavailable.
+async function getYtDlpThumbnail(queryOrUrl) {
+  try {
+    const input = String(queryOrUrl || "").trim();
+    if (!input) return null;
+    // If it's not a URL, treat it as a search query
+    const target = /^https?:\/\//.test(input) ? input : `ytsearch1:${input}`;
+
+    const { stdout } = await execAsync(
+      `yt-dlp --dump-json --skip-download --no-warnings --no-check-certificate --extractor-args "youtube:player_client=web" "${target}"`,
+      { timeout: 15000, maxBuffer: 1024 * 1024 }
+    );
+
+    const data = JSON.parse(stdout);
+    if (!data) return null;
+
+    // yt-dlp returns a 'thumbnails' array with resolutions.
+    // Sort by pixel area (width * height) and pick the best.
+    if (Array.isArray(data.thumbnails) && data.thumbnails.length > 0) {
+      const best = data.thumbnails
+        .filter(t => t.url && t.width && t.height)
+        .sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+      if (best) {
+        console.log(`[yt-dlp] Best thumbnail: ${best.url} (${best.width}x${best.height})`);
+        return best.url;
+      }
+    }
+
+    // Fallback to the single thumbnail field
+    if (data.thumbnail) {
+      console.log(`[yt-dlp] Fallback thumbnail: ${data.thumbnail}`);
+      return data.thumbnail;
+    }
+
+    return null;
+  } catch (e) {
+    // Silently fail if yt-dlp is missing or video is unavailable
+    if (e.code === "ENOENT" || e.message.includes("command not found") || e.message.includes("not recognized")) {
+      console.log("[yt-dlp] Not installed or not in PATH. Skipping.");
+    } else {
+      console.error("[yt-dlp] Thumbnail fetch failed:", e.message.substring(0, 200));
+    }
+    return null;
+  }
 }
 
 // ── Last.fm helpers ──────────────────────────────────
@@ -182,34 +235,60 @@ function lastfmTrackToJSON(track) {
   };
 }
 
-// ── Artwork enrichment via Lavalink ─────────────────
+// ── Artwork enrichment via Lavalink + yt-dlp fallback ─
 async function enrichTracksWithArtwork(client, tracks) {
   const node = client.lavalink.nodeManager.nodes.get("main");
   if (!node || !node.connected) {
     console.log("[Dashboard] No Lavalink node available for artwork enrichment");
-    return tracks;
   }
   const enriched = [];
   for (const track of tracks) {
+    // Skip if track already has artwork (e.g. Last.fm brand image)
     if (track.artwork && track.artwork.length > 10) {
       enriched.push(track);
       continue;
     }
-    try {
-      const query = track.artist + " " + track.title;
-      const result = await node.search({ query, source: "ytmsearch" }, { username: "Dashboard", tag: "Dashboard" });
-      if (result?.tracks?.[0]?.info?.artworkUrl) {
-        track.artwork = result.tracks[0].info.artworkUrl;
-        console.log("[Dashboard] Got artwork for", track.title, ":", track.artwork.substring(0, 60) + "...");
-      } else if (result?.tracks?.[0]?.info?.identifier) {
-        track.artwork = `https://img.youtube.com/vi/${result.tracks[0].info.identifier}/mqdefault.jpg`;
-        console.log("[Dashboard] Got YT thumbnail for", track.title);
-      } else {
-        console.log("[Dashboard] No artwork found for", track.title);
+
+    let found = false;
+
+    // Try 1: Lavalink search
+    if (node && node.connected) {
+      try {
+        const query = track.artist + " " + track.title;
+        const result = await node.search({ query, source: "ytmsearch" }, { username: "Dashboard", tag: "Dashboard" });
+        if (result?.tracks?.[0]?.info?.artworkUrl) {
+          track.artwork = result.tracks[0].info.artworkUrl;
+          console.log("[Dashboard] Got artwork via Lavalink for", track.title);
+          found = true;
+        } else if (result?.tracks?.[0]?.info?.identifier) {
+          track.artwork = `https://img.youtube.com/vi/${result.tracks[0].info.identifier}/mqdefault.jpg`;
+          console.log("[Dashboard] Got YT thumbnail via Lavalink for", track.title);
+          found = true;
+        }
+      } catch (e) {
+        console.error("[Dashboard] Lavalink artwork search failed for", track.title, ":", e.message);
       }
-    } catch (e) {
-      console.error("[Dashboard] Artwork search failed for", track.title, ":", e.message);
     }
+
+    // Try 2: yt-dlp for best-resolution thumbnail
+    if (!found) {
+      try {
+        const query = track.artist + " " + track.title;
+        const ytDlpUrl = await getYtDlpThumbnail(query);
+        if (ytDlpUrl) {
+          track.artwork = ytDlpUrl;
+          console.log("[Dashboard] Got artwork via yt-dlp for", track.title, ":", ytDlpUrl.substring(0, 60) + "...");
+          found = true;
+        }
+      } catch (e) {
+        console.error("[Dashboard] yt-dlp artwork fetch failed for", track.title, ":", e.message);
+      }
+    }
+
+    if (!found) {
+      console.log("[Dashboard] No artwork found for", track.title);
+    }
+
     enriched.push(track);
   }
   return enriched;
@@ -520,15 +599,33 @@ function startDashboard(client) {
         return res.json({ tracks: [] });
       }
 
-      const tracks = rawTracks.map(t => ({
-        title:       t.info?.title || "Unknown",
-        artist:      t.info?.author || "Unknown",
-        artwork:     t.info?.artworkUrl || (t.info?.identifier ? `https://img.youtube.com/vi/${t.info.identifier}/mqdefault.jpg` : null),
-        uri:         t.info?.uri || `ytmsearch:${t.info?.title || ""} ${t.info?.author || ""}`.trim(),
-        durationFmt: t.info?.isStream ? "LIVE" : formatDuration(t.info?.duration || 0),
-        listeners:   0,
-        playcount:   0,
-      }));
+      // Enhance thumbnails with yt-dlp for highest resolution
+      const tracks = [];
+      for (const t of rawTracks) {
+        let artwork = t.info?.artworkUrl || null;
+        const identifier = t.info?.identifier;
+
+        // If Lavalink gave a low-res thumbnail or none, try yt-dlp
+        if ((!artwork || artwork.includes("mqdefault") || artwork.includes("default.jpg")) && identifier) {
+          const ytDlpUrl = await getYtDlpThumbnail(`https://www.youtube.com/watch?v=${identifier}`);
+          if (ytDlpUrl) artwork = ytDlpUrl;
+        }
+
+        // Final fallback: standard YouTube thumbnail
+        if (!artwork && identifier) {
+          artwork = `https://img.youtube.com/vi/${identifier}/hqdefault.jpg`;
+        }
+
+        tracks.push({
+          title:       t.info?.title || "Unknown",
+          artist:      t.info?.author || "Unknown",
+          artwork:     artwork,
+          uri:         t.info?.uri || `ytmsearch:${t.info?.title || ""} ${t.info?.author || ""}`.trim(),
+          durationFmt: t.info?.isStream ? "LIVE" : formatDuration(t.info?.duration || 0),
+          listeners:   0,
+          playcount:   0,
+        });
+      }
 
       res.json({ tracks });
     } catch (err) {
