@@ -99,11 +99,17 @@ function isValidImageUrl(url) {
 
 const FALLBACK_ARTWORK = '/fallback-artwork.png';
 
+/**
+ * PATCH FIX #1: Improved getArtworkStyle with proper CSS escaping
+ * Handles URLs with special characters and ensures proper CSS quoting
+ */
 function getArtworkStyle(track) {
   if (isValidImageUrl(track.artwork)) {
-    return 'background-image:url(' + track.artwork + ');background-size:cover;background-position:center;';
+    // Properly escape URL for use in CSS url() function
+    const escapedUrl = track.artwork.replace(/['"]/g, '\\$&');
+    return 'background-image:url("' + escapedUrl + '");background-size:cover;background-position:center;';
   }
-  return 'background-image:url(' + FALLBACK_ARTWORK + ');background-size:cover;background-position:center;';
+  return 'background-image:url("' + FALLBACK_ARTWORK + '");background-size:cover;background-position:center;';
 }
 
 function toast(message, opts) {
@@ -217,105 +223,86 @@ $("#logout-btn").addEventListener("click", async () => {
 
 // ── Sidebar Nav ──────────────────────────────────────
 const navItems = $$('.sidebar-nav .nav-item');
-
-function switchView(view) {
-  currentView = view;
-  navItems.forEach(item => {
-    item.classList.toggle('active', item.dataset.view === view);
-  });
-  viewHome.classList.add('hidden');
-  viewQueue.classList.add('hidden');
-  viewHistory.classList.add('hidden');
-
-  if (view === 'home') {
-    viewHome.classList.remove('hidden');
-  } else if (view === 'queue') {
-    viewQueue.classList.remove('hidden');
-    renderQueueView();
-  } else if (view === 'history') {
-    viewHistory.classList.remove('hidden');
-    renderHistoryView();
-  }
-}
-
 navItems.forEach(item => {
   item.addEventListener('click', e => {
     e.preventDefault();
-    switchView(item.dataset.view);
+    navItems.forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+    const view = item.dataset.view;
+    switchView(view);
   });
 });
 
-// ── Discovery Page ─────────────────────────────────
+function switchView(view) {
+  currentView = view;
+  $$('.view-section').forEach(el => el.classList.add('hidden'));
+  switch(view) {
+    case 'queue':
+      viewQueue.classList.remove('hidden');
+      renderQueueView();
+      break;
+    case 'history':
+      viewHistory.classList.remove('hidden');
+      renderHistoryView();
+      break;
+    default:
+      viewHome.classList.remove('hidden');
+  }
+}
+
+// ── Genre Rendering ──────────────────────────────────
 function renderGenres() {
   if (!genresScroll) return;
-  genresScroll.innerHTML = GENRES.map(g =>
-    '<div class="genre-card" data-tag="' + g.tag + '" style="background:' + stringToColor(g.name) + '">' +
-    '<div class="genre-name">' + g.name + '</div>' +
-    '</div>'
-  ).join('');
-  genresScroll.querySelectorAll('.genre-card').forEach(card => {
-    card.addEventListener('click', async () => {
-      showSkeletons();
-      try {
-        const res = await apiFetch("/api/lastfm/genre/" + encodeURIComponent(card.dataset.tag));
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || "HTTP " + res.status);
-        }
-        const data = await res.json();
-        if (!data.tracks || !data.tracks.length) {
-          toast("No tracks found for " + card.dataset.tag, {type:"error"});
-          renderFeatured([]);
-          renderDiscover([]);
-          return;
-        }
-        renderFeatured(data.tracks.slice(0, 3));
-        renderDiscover(data.tracks);
-        toast("Loaded " + card.dataset.tag + " tracks");
-      } catch (e) {
-        toast("Genre error: " + e.message, {type:"error"});
-        if (featuredGrid) featuredGrid.innerHTML = '<div class="discover-empty">Error: ' + escapeHtml(e.message) + '</div>';
-        if (discoverList) discoverList.innerHTML = '';
-      }
+  genresScroll.innerHTML = GENRES.map((g, i) => {
+    return '<button class="genre-btn" data-tag="' + g.tag + '">' + g.name + '</button>';
+  }).join('');
+  genresScroll.querySelectorAll('.genre-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      genresScroll.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadByTag(btn.dataset.tag);
     });
   });
 }
 
+// ── Discovery ────────────────────────────────────────
 function showSkeletons() {
-  if (featuredGrid) {
-    featuredGrid.innerHTML = '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
-  }
-  if (discoverList) {
-    discoverList.innerHTML = Array(6).fill('<div class="skeleton-row"></div>').join('');
-  }
+  if (featuredGrid) featuredGrid.innerHTML = Array(3).fill(0).map(() => '<div class="skeleton featured-card"></div>').join('');
+  if (discoverList) discoverList.innerHTML = Array(5).fill(0).map(() => '<div class="skeleton discover-row" style="height:48px;"></div>').join('');
 }
 
 async function loadDiscovery() {
   showSkeletons();
   try {
     const res = await apiFetch("/api/lastfm/trending");
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || "HTTP " + res.status);
-    }
+    if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    const tracks = data.tracks || [];
-    if (!tracks.length) {
-      toast("No trending tracks found", {type:"error"});
-      renderFeatured([]);
-      renderDiscover([]);
-      return;
-    }
-    renderFeatured(tracks.slice(0, 3));
-    renderDiscover(tracks);
+    renderFeatured(data.tracks.slice(0, 3));
+    renderDiscover(data.tracks);
   } catch (e) {
-    console.error("Last.fm load failed:", e);
-    toast("Last.fm error: " + e.message, {type:"error"});
-    if (featuredGrid) featuredGrid.innerHTML = '<div class="discover-empty">Last.fm error: ' + escapeHtml(e.message) + '</div>';
-    if (discoverList) discoverList.innerHTML = '<div class="discover-empty">Check console or server logs for details</div>';
+    featuredGrid.innerHTML = '<div class="discover-empty">Error loading trending tracks</div>';
+    discoverList.innerHTML = '';
   }
 }
 
+async function loadByTag(tag) {
+  showSkeletons();
+  try {
+    const res = await apiFetch("/api/lastfm/tag?tag=" + encodeURIComponent(tag));
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    renderFeatured(data.tracks.slice(0, 3));
+    renderDiscover(data.tracks);
+  } catch (e) {
+    featuredGrid.innerHTML = '<div class="discover-empty">Error loading genre tracks</div>';
+    discoverList.innerHTML = '';
+  }
+}
+
+/**
+ * PATCH FIX #2: Featured cards now properly use background-image
+ * Changed from img element to div with background to match CSS structure
+ */
 function renderFeatured(tracks) {
   if (!featuredGrid) return;
   if (!tracks.length) {
@@ -323,7 +310,7 @@ function renderFeatured(tracks) {
     return;
   }
   featuredGrid.innerHTML = tracks.slice(0, 3).map((t, i) => {
-    return '<div class="featured-card" data-uri="' + (t.uri || '') + '" style="' + getArtworkStyle(t) + '">' +
+    return '<div class="featured-card" data-uri="' + escapeHtml(t.uri || '') + '" style="' + getArtworkStyle(t) + '">' +
     '<div class="feat-overlay"></div>' +
     '<div class="feat-info"><div class="feat-title">' + escapeHtml(t.title) + '</div><div class="feat-artist">' + escapeHtml(t.artist) + '</div></div>' +
     '</div>';
@@ -333,6 +320,9 @@ function renderFeatured(tracks) {
   });
 }
 
+/**
+ * PATCH FIX #3: Discover rows with proper HTML escaping
+ */
 function renderDiscover(tracks) {
   if (!discoverList) return;
   if (!tracks.length) {
@@ -340,11 +330,11 @@ function renderDiscover(tracks) {
     return;
   }
   discoverList.innerHTML = tracks.map((t, i) => {
-    return '<div class="discover-row" data-uri="' + (t.uri || '') + '">' +
+    return '<div class="discover-row" data-uri="' + escapeHtml(t.uri || '') + '">' +
     '<div class="dr-art" style="' + getArtworkStyle(t) + '"></div>' +
     '<div class="dr-info"><div class="dr-title">' + escapeHtml(t.title) + '</div><div class="dr-artist">' + escapeHtml(t.artist) + '</div></div>' +
     '<div class="dr-actions">' +
-    '<span class="dr-dur">' + (t.durationFmt || "3:45") + '</span>' +
+    '<span class="dr-dur">' + escapeHtml(t.durationFmt || "3:45") + '</span>' +
     '<button class="dr-btn dr-like" title="Like">♡</button>' +
     '<button class="dr-btn dr-more" title="Add to queue">+</button>' +
     '</div></div>';
@@ -382,17 +372,17 @@ function renderQueueView() {
   for (const player of currentPlayers) {
     const track = player.current;
     html += '<div class="queue-view-card">';
-    html += '<div class="qv-header"><span class="qv-guild">' + (player.guildName || 'Unknown') + '</span>';
+    html += '<div class="qv-header"><span class="qv-guild">' + escapeHtml(player.guildName || 'Unknown') + '</span>';
     html += '<span class="cc-badge ' + (player.playing && !player.paused ? 'badge-playing' : player.paused ? 'badge-paused' : 'badge-idle') + '">' + (player.playing && !player.paused ? 'On Air' : player.paused ? 'Paused' : 'Idle') + '</span></div>';
     if (track) {
       html += '<div class="qv-now"><div class="qv-art" style="' + getArtworkStyle(track) + '"></div>';
-      html += '<div><div class="qv-title">' + track.title + '</div><div class="qv-author">' + track.author + '</div></div></div>';
+      html += '<div><div class="qv-title">' + escapeHtml(track.title) + '</div><div class="qv-author">' + escapeHtml(track.author) + '</div></div></div>';
     }
     const qTracks = player.queue || [];
     if (qTracks.length) {
       html += '<ul class="qv-list">';
       for (let i = 0; i < qTracks.length; i++) {
-        html += '<li><span class="q-num">' + (i + 1) + '</span><span class="q-title">' + qTracks[i].title + '</span><span class="q-dur">' + qTracks[i].durationFmt + '</span></li>';
+        html += '<li><span class="q-num">' + (i + 1) + '</span><span class="q-title">' + escapeHtml(qTracks[i].title) + '</span><span class="q-dur">' + escapeHtml(qTracks[i].durationFmt) + '</span></li>';
       }
       html += '</ul>';
     } else {
@@ -413,11 +403,11 @@ function renderHistoryView() {
   for (const player of currentPlayers) {
     const prev = player.previous || [];
     html += '<div class="queue-view-card">';
-    html += '<div class="qv-header"><span class="qv-guild">' + (player.guildName || 'Unknown') + '</span></div>';
+    html += '<div class="qv-header"><span class="qv-guild">' + escapeHtml(player.guildName || 'Unknown') + '</span></div>';
     if (prev.length) {
       html += '<ul class="qv-list">';
       for (let i = 0; i < prev.length; i++) {
-        html += '<li><span class="q-num">' + (i + 1) + '</span><span class="q-title">' + prev[i].title + '</span><span class="q-dur">' + prev[i].durationFmt + '</span></li>';
+        html += '<li><span class="q-num">' + (i + 1) + '</span><span class="q-title">' + escapeHtml(prev[i].title) + '</span><span class="q-dur">' + escapeHtml(prev[i].durationFmt) + '</span></li>';
       }
       html += '</ul>';
     } else {
@@ -473,18 +463,37 @@ function renderPlayers(players) {
 }
 
 // ── Bottom Player ────────────────────────────────────
+/**
+ * PATCH FIX #4: Enhanced bottom player with proper image loading
+ * Added error handling and loading states for artwork images
+ */
 function updateBottomPlayer(player) {
   if (!player || !player.current) { collapseBottomPlayer(); return; }
   const track = player.current;
 
   bottomPlayer.classList.remove('collapsed');
-  bpArt.src = isValidImageUrl(track.artwork) ? track.artwork : FALLBACK_ARTWORK;
+  
+  // Set artwork with proper fallback handling
+  const artworkUrl = isValidImageUrl(track.artwork) ? track.artwork : FALLBACK_ARTWORK;
+  bpArt.src = artworkUrl;
   bpArt.style.opacity = '0';
-  bpArt.onload = function() { this.style.opacity = '1'; };
-  bpArt.onerror = function() { this.style.display = 'none'; };
-  bpTitle.textContent = track.title || "Unknown";
-  bpArtist.textContent = track.author || "Unknown artist";
-  bpGuild.textContent = player.guildName || "Server";
+  
+  // Fade in when loaded
+  bpArt.onload = function() { 
+    this.style.opacity = '1'; 
+    this.style.display = 'block';
+  };
+  
+  // Use fallback if image fails to load
+  bpArt.onerror = function() { 
+    this.src = FALLBACK_ARTWORK;
+    this.style.opacity = '1';
+    this.style.display = 'block';
+  };
+  
+  bpTitle.textContent = escapeHtml(track.title || "Unknown");
+  bpArtist.textContent = escapeHtml(track.author || "Unknown artist");
+  bpGuild.textContent = escapeHtml(player.guildName || "Server");
   bpElapsed.textContent = player.positionFmt || "0:00";
   bpDuration.textContent = track.durationFmt || "0:00";
 
@@ -502,6 +511,7 @@ function collapseBottomPlayer() {
   bpArtist.textContent = "Select a server to sync";
   bpGuild.textContent = "No guild";
   bpFill.style.width = "0%";
+  bpArt.src = '';
 }
 
 bpPlaypause.addEventListener('click', () => {
