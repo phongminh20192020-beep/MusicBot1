@@ -165,15 +165,8 @@ function sortByRelevance(tracks, rawQuery) {
 function lastfmTrackToJSON(track) {
   if (!track || typeof track !== "object") return null;
   const artist = typeof track.artist === "string" ? track.artist : (track.artist?.name || track.artist?.["#text"] || "Unknown");
-  const img = Array.isArray(track.image) ? track.image : [];
-  let artwork = null;
-  for (const size of ["extralarge", "large", "medium", "small", ""]) {
-    const found = img.find(i => i.size === size);
-    if (found && found["#text"] && found["#text"].trim().length > 10) {
-      artwork = found["#text"].trim();
-      break;
-    }
-  }
+  // Use the brand image for all Last.fm tracks instead of Last.fm artwork
+  const artwork = "/lastfm-brand.png";
   // Build clean ytmsearch query — NO encodeURIComponent here (lavalink-client handles it)
   const rawQuery = (artist + " " + (track.name || "")).trim();
   const cleanQuery = sanitizeSearchQuery(rawQuery);
