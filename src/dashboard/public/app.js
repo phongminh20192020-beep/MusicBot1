@@ -97,11 +97,13 @@ function isValidImageUrl(url) {
   return url && typeof url === "string" && url.trim().length > 10 && /^https?:\/\//.test(url);
 }
 
+const FALLBACK_ARTWORK = '/fallback-artwork.png';
+
 function getArtworkStyle(track) {
   if (isValidImageUrl(track.artwork)) {
     return 'background-image:url(' + track.artwork + ');background-size:cover;background-position:center;';
   }
-  return 'background:' + stringToColor(track.title + track.artist) + ';';
+  return 'background-image:url(' + FALLBACK_ARTWORK + ');background-size:cover;background-position:center;';
 }
 
 function toast(message, opts) {
@@ -476,7 +478,7 @@ function updateBottomPlayer(player) {
   const track = player.current;
 
   bottomPlayer.classList.remove('collapsed');
-  bpArt.src = isValidImageUrl(track.artwork) ? track.artwork : '';
+  bpArt.src = isValidImageUrl(track.artwork) ? track.artwork : FALLBACK_ARTWORK;
   bpArt.style.opacity = '0';
   bpArt.onload = function() { this.style.opacity = '1'; };
   bpArt.onerror = function() { this.style.display = 'none'; };
