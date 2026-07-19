@@ -272,6 +272,11 @@ function showSkeletons() {
 }
 
 async function loadDiscovery() {
+  if (featuredGrid && featuredGrid.parentElement) featuredGrid.parentElement.classList.remove('hidden');
+  const discoverTitle = discoverList?.previousElementSibling;
+  if (discoverTitle && discoverTitle.classList.contains('discover-title')) {
+    discoverTitle.textContent = "Discover new music";
+  }
   showSkeletons();
   try {
     const res = await apiFetch("/api/lastfm/trending");
@@ -286,6 +291,11 @@ async function loadDiscovery() {
 }
 
 async function loadByTag(tag) {
+  if (featuredGrid && featuredGrid.parentElement) featuredGrid.parentElement.classList.remove('hidden');
+  const discoverTitle = discoverList?.previousElementSibling;
+  if (discoverTitle && discoverTitle.classList.contains('discover-title')) {
+    discoverTitle.textContent = "Discover new music";
+  }
   showSkeletons();
   try {
     const res = await apiFetch("/api/lastfm/tag?tag=" + encodeURIComponent(tag));
@@ -568,7 +578,12 @@ function doGlobalSearch() {
 }
 
 async function searchLastFm(query) {
-  showSkeletons();
+  if (featuredGrid) featuredGrid.innerHTML = '';
+  if (featuredGrid && featuredGrid.parentElement) featuredGrid.parentElement.classList.add('hidden');
+  if (discoverList) {
+    discoverList.innerHTML = Array(5).fill(0).map(() => '<div class="skeleton discover-row" style="height:48px;"></div>').join('');
+  }
+
   try {
     const res = await apiFetch("/api/lastfm/search?q=" + encodeURIComponent(query));
     if (!res.ok) {
@@ -576,14 +591,30 @@ async function searchLastFm(query) {
       throw new Error(errData.error || "HTTP " + res.status);
     }
     const data = await res.json();
-    const tracks = data.tracks || [];
-    if (!tracks.length) { toast("No results found", {type:"error"}); renderFeatured([]); renderDiscover([]); return; }
-    renderFeatured(tracks.slice(0, 3));
+    let tracks = data.tracks || [];
+    if (!tracks.length) {
+      toast("No results found", {type:"error"});
+      renderDiscover([]);
+      return;
+    }
+
+    tracks.sort((a, b) => {
+      const aText = ((a.title || "") + " " + (a.artist || "")).toLowerCase();
+      const bText = ((b.title || "") + " " + (b.artist || "")).toLowerCase();
+      const aHasOfficial = aText.includes("official") ? 0 : 1;
+      const bHasOfficial = bText.includes("official") ? 0 : 1;
+      return aHasOfficial - bHasOfficial;
+    });
+
+    const discoverTitle = discoverList?.previousElementSibling;
+    if (discoverTitle && discoverTitle.classList.contains('discover-title')) {
+      discoverTitle.textContent = "Search Results (" + tracks.length + ")";
+    }
+
     renderDiscover(tracks);
   } catch (e) {
     toast("Search error: " + e.message, {type:"error"});
-    if (featuredGrid) featuredGrid.innerHTML = '<div class="discover-empty">Search error: ' + escapeHtml(e.message) + '</div>';
-    if (discoverList) discoverList.innerHTML = '';
+    if (discoverList) discoverList.innerHTML = '<div class="discover-empty">Search error: ' + escapeHtml(e.message) + '</div>';
   }
 }
 
