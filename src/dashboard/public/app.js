@@ -585,7 +585,7 @@ async function searchLastFm(query) {
   }
 
   try {
-    const res = await apiFetch("/api/lastfm/search?q=" + encodeURIComponent(query));
+    const res = await apiFetch("/api/search?q=" + encodeURIComponent(query));
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || "HTTP " + res.status);
