@@ -489,7 +489,7 @@ function startDashboard(client) {
     try {
       const q = (req.query.q || "").toString().trim();
       if (!q) return res.status(400).json({ error: "q is required" });
-      const data = await lastfmFetch("track.search", { track: q, limit: "12" });
+      const data = await lastfmFetch("track.search", { track: q, limit: "30" });
       const raw = data.results?.trackmatches?.track || [];
       let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
       tracks = await enrichTracksWithArtwork(client, tracks);
