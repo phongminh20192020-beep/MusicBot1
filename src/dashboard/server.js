@@ -512,13 +512,17 @@ function startDashboard(client) {
       }
 
       console.log("[Dashboard] ytmsearch:", q);
-      const result = await node.search({ query: q, source: "ytmsearch" }, { username: "Dashboard", tag: "Dashboard" });
+      const result = await node.search({ query: q, source: "ytmsearch" }, { username: "Dashboard", tag: "Dashboard" }).catch((e) => {
+        console.error("[Dashboard] ytmsearch node error:", e.message);
+        return null;
+      });
 
-      if (result.loadType === "error" || !result.tracks?.length) {
+      const rawTracks = result?.tracks || [];
+      if (!rawTracks.length) {
         return res.json({ tracks: [] });
       }
 
-      const tracks = result.tracks.map(t => ({
+      const tracks = rawTracks.map(t => ({
         title:       t.info?.title || "Unknown",
         artist:      t.info?.author || "Unknown",
         artwork:     t.info?.artworkUrl || (t.info?.identifier ? `https://img.youtube.com/vi/${t.info.identifier}/mqdefault.jpg` : null),
