@@ -500,6 +500,41 @@ function startDashboard(client) {
     }
   });
 
+  // ─── YouTube Music Search (Global) ──────────────────
+  app.get("/api/search", requireAuth, async (req, res) => {
+    try {
+      const q = (req.query.q || "").toString().trim();
+      if (!q) return res.status(400).json({ error: "q is required" });
+
+      const node = client.lavalink.nodeManager.nodes.get("main");
+      if (!node || !node.connected) {
+        return res.status(503).json({ error: "Lavalink node not available" });
+      }
+
+      console.log("[Dashboard] ytmsearch:", q);
+      const result = await node.search({ query: q, source: "ytmsearch" }, { username: "Dashboard", tag: "Dashboard" });
+
+      if (result.loadType === "error" || !result.tracks?.length) {
+        return res.json({ tracks: [] });
+      }
+
+      const tracks = result.tracks.map(t => ({
+        title:       t.info?.title || "Unknown",
+        artist:      t.info?.author || "Unknown",
+        artwork:     t.info?.artworkUrl || (t.info?.identifier ? `https://img.youtube.com/vi/${t.info.identifier}/mqdefault.jpg` : null),
+        uri:         t.info?.uri || `ytmsearch:${t.info?.title || ""} ${t.info?.author || ""}`.trim(),
+        durationFmt: t.info?.isStream ? "LIVE" : formatDuration(t.info?.duration || 0),
+        listeners:   0,
+        playcount:   0,
+      }));
+
+      res.json({ tracks });
+    } catch (err) {
+      console.error("[Dashboard] ytmsearch error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ─── Socket.IO ──────────────────────────────────────
   io.use((socket, next) => { if (isValidFromHeader(socket.handshake.headers.cookie)) return next(); next(new Error("unauthorized")); });
 
