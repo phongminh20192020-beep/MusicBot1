@@ -218,8 +218,8 @@ function sortByRelevance(tracks, rawQuery) {
 function lastfmTrackToJSON(track) {
   if (!track || typeof track !== "object") return null;
   const artist = typeof track.artist === "string" ? track.artist : (track.artist?.name || track.artist?.["#text"] || "Unknown");
-  // Use the brand image for all Last.fm tracks instead of Last.fm artwork
-  const artwork = "/lastfm-brand.png";
+  // Start with no artwork — enrichTracksWithArtwork will fill this in via Lavalink/yt-dlp
+  const artwork = null;
   // Build clean ytmsearch query — NO encodeURIComponent here (lavalink-client handles it)
   const rawQuery = (artist + " " + (track.name || "")).trim();
   const cleanQuery = sanitizeSearchQuery(rawQuery);
@@ -236,15 +236,17 @@ function lastfmTrackToJSON(track) {
 }
 
 // ── Artwork enrichment via Lavalink + yt-dlp fallback ─
-async function enrichTracksWithArtwork(client, tracks) {
+// Only the first `limit` tracks get artwork fetched; the rest pass through as-is.
+async function enrichTracksWithArtwork(client, tracks, limit = 10) {
   const node = client.lavalink.nodeManager.nodes.get("main");
   if (!node || !node.connected) {
     console.log("[Dashboard] No Lavalink node available for artwork enrichment");
   }
   const enriched = [];
+  let enrichCount = 0;
   for (const track of tracks) {
-    // Skip if track already has artwork (e.g. Last.fm brand image)
-    if (track.artwork && track.artwork.length > 10) {
+    // Only enrich up to `limit` tracks (saves Lavalink from getting hammered)
+    if (enrichCount >= limit || (track.artwork && isValidHttpUrl(track.artwork))) {
       enriched.push(track);
       continue;
     }
@@ -289,9 +291,15 @@ async function enrichTracksWithArtwork(client, tracks) {
       console.log("[Dashboard] No artwork found for", track.title);
     }
 
+    enrichCount++;
     enriched.push(track);
   }
   return enriched;
+}
+
+// Simple helper — reused in enrichTracksWithArtwork
+function isValidHttpUrl(url) {
+  return typeof url === "string" && /^https?:\/\//.test(url) && url.length > 10;
 }
 
 // ── Search cache ───────────────────────────────────
@@ -519,13 +527,13 @@ function startDashboard(client) {
   app.get("/api/lastfm/trending", requireAuth, async (req, res) => {
     try {
       console.log("[Dashboard] Fetching Last.fm trending...");
-      const data = await lastfmFetch("chart.gettoptracks", { limit: "24" });
+      const data = await lastfmFetch("chart.gettoptracks", { limit: "20" });
       const raw = data.tracks?.track || [];
       console.log("[Dashboard] Last.fm returned", raw.length, "tracks");
-      let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      let tracks = raw.slice(0, 20).map(lastfmTrackToJSON).filter(Boolean);
       console.log("[Dashboard] Parsed", tracks.length, "valid tracks");
-      tracks = await enrichTracksWithArtwork(client, tracks);
-      console.log("[Dashboard] Enriched", tracks.length, "tracks with artwork");
+      tracks = await enrichTracksWithArtwork(client, tracks, 10);
+      console.log("[Dashboard] Enriched first 10 of", tracks.length, "tracks with artwork");
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] Last.fm trending error:", err.message);
@@ -538,13 +546,13 @@ function startDashboard(client) {
       const tag = (req.query.tag || "").toString().trim();
       if (!tag) return res.status(400).json({ error: "tag is required" });
       console.log("[Dashboard] Fetching Last.fm tag:", tag);
-      const data = await lastfmFetch("tag.gettoptracks", { tag, limit: "30" });
+      const data = await lastfmFetch("tag.gettoptracks", { tag, limit: "20" });
       const raw = data.tracks?.track || [];
       console.log("[Dashboard] Last.fm tag returned", raw.length, "tracks");
-      let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      let tracks = raw.slice(0, 20).map(lastfmTrackToJSON).filter(Boolean);
       console.log("[Dashboard] Parsed", tracks.length, "valid tracks");
-      tracks = await enrichTracksWithArtwork(client, tracks);
-      console.log("[Dashboard] Enriched", tracks.length, "tracks with artwork");
+      tracks = await enrichTracksWithArtwork(client, tracks, 10);
+      console.log("[Dashboard] Enriched first 10 of", tracks.length, "tracks with artwork");
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] Last.fm tag error:", err.message);
@@ -566,10 +574,10 @@ function startDashboard(client) {
     try {
       const q = (req.query.q || "").toString().trim();
       if (!q) return res.status(400).json({ error: "q is required" });
-      const data = await lastfmFetch("track.search", { track: q, limit: "30" });
+      const data = await lastfmFetch("track.search", { track: q, limit: "20" });
       const raw = data.results?.trackmatches?.track || [];
-      let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
-      tracks = await enrichTracksWithArtwork(client, tracks);
+      let tracks = raw.slice(0, 20).map(lastfmTrackToJSON).filter(Boolean);
+      tracks = await enrichTracksWithArtwork(client, tracks, 10);
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] Last.fm search error:", err.message);
@@ -599,14 +607,15 @@ function startDashboard(client) {
         return res.json({ tracks: [] });
       }
 
-      // Enhance thumbnails with yt-dlp for highest resolution
+      // Enhance thumbnails with yt-dlp for highest resolution (first 10 only to avoid overload)
       const tracks = [];
-      for (const t of rawTracks) {
+      for (let i = 0; i < rawTracks.length; i++) {
+        const t = rawTracks[i];
         let artwork = t.info?.artworkUrl || null;
         const identifier = t.info?.identifier;
 
-        // If Lavalink gave no thumbnail or only a low-res mqdefault, try yt-dlp for better quality
-        if ((!artwork || artwork.includes("mqdefault")) && identifier) {
+        // Only run yt-dlp for the first 10 tracks — it's slow; the rest use the YT fallback
+        if (i < 10 && (!artwork || artwork.includes("mqdefault")) && identifier) {
           const ytDlpUrl = await getYtDlpThumbnail(`https://www.youtube.com/watch?v=${identifier}`);
           if (ytDlpUrl) artwork = ytDlpUrl;
         }

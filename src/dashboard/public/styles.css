@@ -2026,6 +2026,39 @@ input {
   color: var(--text);
 }
 
+/* ── Discover pagination ── */
+.discover-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 0 4px;
+}
+.discover-pagination.hidden { display: none; }
+.dp-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, opacity 0.15s;
+}
+.dp-btn:hover:not(:disabled) { background: var(--surface-3); }
+.dp-btn:disabled { opacity: 0.3; cursor: default; }
+.dp-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: center;
+}
+
 /* ══════════════════════════════════════════════════════
    BOTTOM PLAYER BAR
 ════════════════════════════════════════════════════════ */

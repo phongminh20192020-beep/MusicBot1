@@ -37,13 +37,22 @@ const viewQueue     = $("#view-queue");
 const viewHistory   = $("#view-history");
 const genresScroll  = $("#genres-scroll");
 const featuredGrid  = $("#featured-grid");
-const discoverList  = $("#discover-list");
+const discoverList       = $("#discover-list");
+const discoverPagination = $("#discover-pagination");
+const dpPrev             = $("#dp-prev");
+const dpNext             = $("#dp-next");
+const dpLabel            = $("#dp-label");
 
 // ── State ────────────────────────────────────────────
 let socket = null;
 let currentPlayers = [];
 let activeGuildId = null;
 let currentView = "home";
+
+// Discover pagination state
+let discoverAllTracks = [];   // all fetched tracks (up to 20)
+let discoverPage = 0;         // 0 = tracks 1-10, 1 = tracks 11-20
+const PAGE_SIZE = 10;
 
 // ── Genre Data (Last.fm tag names) ───────────────────
 const GENRES = [
@@ -281,11 +290,14 @@ async function loadDiscovery() {
     const res = await apiFetch("/api/lastfm/trending");
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    renderFeatured(data.tracks.slice(0, 3));
-    renderDiscover(data.tracks);
+    discoverAllTracks = data.tracks || [];
+    discoverPage = 0;
+    renderFeatured(discoverAllTracks.slice(0, 3));
+    renderDiscover(discoverAllTracks, 0);
   } catch (e) {
     featuredGrid.innerHTML = '<div class="discover-empty">Error loading trending tracks</div>';
     discoverList.innerHTML = '';
+    if (discoverPagination) discoverPagination.classList.add('hidden');
   }
 }
 
@@ -299,11 +311,14 @@ async function loadByTag(tag) {
     const res = await apiFetch("/api/lastfm/tag?tag=" + encodeURIComponent(tag));
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    renderFeatured(data.tracks.slice(0, 3));
-    renderDiscover(data.tracks);
+    discoverAllTracks = data.tracks || [];
+    discoverPage = 0;
+    renderFeatured(discoverAllTracks.slice(0, 3));
+    renderDiscover(discoverAllTracks, 0);
   } catch (e) {
     featuredGrid.innerHTML = '<div class="discover-empty">Error loading genre tracks</div>';
     discoverList.innerHTML = '';
+    if (discoverPagination) discoverPagination.classList.add('hidden');
   }
 }
 
@@ -329,15 +344,23 @@ function renderFeatured(tracks) {
 }
 
 /**
- * PATCH FIX #3: Discover rows with proper HTML escaping
+ * PATCH FIX #3: Discover rows with proper HTML escaping + pagination
  */
-function renderDiscover(tracks) {
+function renderDiscover(allTracks, page) {
+  if (page === undefined) page = discoverPage;
   if (!discoverList) return;
-  if (!tracks.length) {
+  const total = allTracks.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const start = page * PAGE_SIZE;
+  const pageTracks = allTracks.slice(start, start + PAGE_SIZE);
+
+  if (!pageTracks.length) {
     discoverList.innerHTML = '<div class="discover-empty">No tracks found</div>';
+    if (discoverPagination) discoverPagination.classList.add('hidden');
     return;
   }
-  discoverList.innerHTML = tracks.map((t, i) => {
+
+  discoverList.innerHTML = pageTracks.map((t) => {
     return '<div class="discover-row" data-uri="' + escapeHtml(t.uri || '') + '">' +
     '<div class="dr-art" style="' + getArtworkStyle(t) + '"></div>' +
     '<div class="dr-info"><div class="dr-title">' + escapeHtml(t.title) + '</div><div class="dr-artist">' + escapeHtml(t.artist) + '</div></div>' +
@@ -347,6 +370,7 @@ function renderDiscover(tracks) {
     '<button class="dr-btn dr-more" title="Add to queue">+</button>' +
     '</div></div>';
   }).join('');
+
   discoverList.querySelectorAll('.discover-row').forEach(row => {
     row.addEventListener('click', e => {
       if (e.target.closest('.dr-btn')) return;
@@ -355,6 +379,18 @@ function renderDiscover(tracks) {
     const moreBtn = row.querySelector('.dr-more');
     if (moreBtn) moreBtn.addEventListener('click', () => playUri(row.dataset.uri, row.querySelector('.dr-title').textContent));
   });
+
+  // Update pagination controls
+  if (discoverPagination) {
+    if (totalPages > 1) {
+      discoverPagination.classList.remove('hidden');
+      if (dpLabel) dpLabel.textContent = (page + 1) + ' / ' + totalPages;
+      if (dpPrev)  dpPrev.disabled  = page <= 0;
+      if (dpNext)  dpNext.disabled  = page >= totalPages - 1;
+    } else {
+      discoverPagination.classList.add('hidden');
+    }
+  }
 }
 
 async function playUri(uri, title) {
@@ -601,9 +637,11 @@ async function searchLastFm(query) {
       return aHasOfficial - bHasOfficial;
     });
 
-    // Show top 3 as featured cards, ALL results in discover list
+    // Show top 3 as featured cards; paginate the rest
+    discoverAllTracks = tracks;
+    discoverPage = 0;
     renderFeatured(tracks.slice(0, 3));
-    renderDiscover(tracks);
+    renderDiscover(tracks, 0);
 
     const discoverTitle = discoverList?.previousElementSibling;
     if (discoverTitle && discoverTitle.classList.contains('discover-title')) {
@@ -613,6 +651,7 @@ async function searchLastFm(query) {
     toast("Search error: " + e.message, {type:"error"});
     if (featuredGrid) featuredGrid.innerHTML = '<div class="discover-empty">Search error: ' + escapeHtml(e.message) + '</div>';
     if (discoverList) discoverList.innerHTML = '';
+    if (discoverPagination) discoverPagination.classList.add('hidden');
   }
 }
 
@@ -624,6 +663,27 @@ globalSearchInput.addEventListener("input", () => {
 globalSearchInput.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); clearTimeout(globalDebounce); doGlobalSearch(); }
 });
+
+// ── Discover pagination controls ─────────────────────
+if (dpPrev) {
+  dpPrev.addEventListener('click', () => {
+    if (discoverPage > 0) {
+      discoverPage--;
+      renderDiscover(discoverAllTracks, discoverPage);
+      discoverList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+}
+if (dpNext) {
+  dpNext.addEventListener('click', () => {
+    const totalPages = Math.ceil(discoverAllTracks.length / PAGE_SIZE);
+    if (discoverPage < totalPages - 1) {
+      discoverPage++;
+      renderDiscover(discoverAllTracks, discoverPage);
+      discoverList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+}
 
 // ── Init ─────────────────────────────────────────────
 (async function init() {
