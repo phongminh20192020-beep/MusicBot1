@@ -97,7 +97,7 @@ function isValidImageUrl(url) {
   return url && typeof url === "string" && url.trim().length > 10 && /^https?:\/\//.test(url);
 }
 
-const FALLBACK_ARTWORK = '/fallback-artwork.png';
+const FALLBACK_ARTWORK = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyMDAgMjAwJz48cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgZmlsbD0nIzFhMWEyZScvPjxjaXJjbGUgY3g9JzEwMCcgY3k9JzEwMCcgcj0nOTAnIGZpbGw9JyMxMjEyMmEnLz48cGF0aCBkPSdNODUgNjUgTDg1IDEzMCBRODUgMTQyIDc1IDE0NSBRNTggMTUwIDU1IDEzOCBRNTIgMTI1IDY4IDEyMCBMNzUgMTE4IEw3NSA3NSBMMTI1IDYyIEwxMjUgMTA4IFExMjUgMTIwIDExNSAxMjMgUTk4IDEyOCA5NSAxMTYgUTkyIDEwMyAxMDggOTggTDExNSA5NiBMMTE1IDU4IFonIGZpbGw9JyNlMGUwZTAnLz48L3N2Zz4=';
 
 /**
  * PATCH FIX #1: Improved getArtworkStyle with proper CSS escaping

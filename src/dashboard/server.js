@@ -261,7 +261,7 @@ async function enrichTracksWithArtwork(client, tracks) {
           console.log("[Dashboard] Got artwork via Lavalink for", track.title);
           found = true;
         } else if (result?.tracks?.[0]?.info?.identifier) {
-          track.artwork = `https://img.youtube.com/vi/${result.tracks[0].info.identifier}/mqdefault.jpg`;
+          track.artwork = `https://img.youtube.com/vi/${result.tracks[0].info.identifier}/hqdefault.jpg`;
           console.log("[Dashboard] Got YT thumbnail via Lavalink for", track.title);
           found = true;
         }
@@ -319,7 +319,7 @@ function trackToSearchJSON(guildId, track) {
     isStream:    !!track.info.isStream,
     source:      track.info.sourceName || "unknown",
     uri:         track.info.uri || null,
-    artwork:     track.info.artworkUrl?.trim() || (track.info.identifier ? `https://img.youtube.com/vi/${track.info.identifier}/mqdefault.jpg` : null),
+    artwork:     track.info.artworkUrl?.trim() || (track.info.identifier ? `https://img.youtube.com/vi/${track.info.identifier}/hqdefault.jpg` : null),
   };
 }
 
@@ -605,8 +605,8 @@ function startDashboard(client) {
         let artwork = t.info?.artworkUrl || null;
         const identifier = t.info?.identifier;
 
-        // If Lavalink gave a low-res thumbnail or none, try yt-dlp
-        if ((!artwork || artwork.includes("mqdefault") || artwork.includes("default.jpg")) && identifier) {
+        // If Lavalink gave no thumbnail or only a low-res mqdefault, try yt-dlp for better quality
+        if ((!artwork || artwork.includes("mqdefault")) && identifier) {
           const ytDlpUrl = await getYtDlpThumbnail(`https://www.youtube.com/watch?v=${identifier}`);
           if (ytDlpUrl) artwork = ytDlpUrl;
         }

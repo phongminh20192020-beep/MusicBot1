@@ -14,7 +14,7 @@ function trackToJSON(track) {
     source:      track.info.sourceName || "unknown",
     artwork:
       track.info.artworkUrl?.trim() ||
-      (track.info.identifier ? `https://img.youtube.com/vi/${track.info.identifier}/mqdefault.jpg` : null),
+      (track.info.identifier ? `https://img.youtube.com/vi/${track.info.identifier}/hqdefault.jpg` : null),
     requester: track.requester?.username || track.requester?.tag || "Unknown",
   };
 }
