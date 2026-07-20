@@ -247,7 +247,7 @@ module.exports = {
         let added = 0;
         for (const { query: ytQuery, title, duration } of tracks) {
           try {
-            const res = await player.search({ query: ytQuery, source: "ytmsearch" }, interaction.user);
+            const res = await player.search({ query: ytQuery, source: "ytsearch" }, interaction.user);
             const match = pickBestTrackMatch(res?.tracks, duration);
             if (match) {
               player.queue.add(match);

@@ -1688,6 +1688,10 @@ input {
    QUEUE / HISTORY VIEWS
 ════════════════════════════════════════════════════════ */
 
+.view-section {
+  animation: fadeIn 0.25s ease;
+}
+
 .queue-view, .history-view {
   animation: fadeIn 0.2s ease;
 }
@@ -1852,13 +1856,44 @@ input {
 }
 
 @media (max-width: 700px) {
-  .genre-card { width: calc(50% - 7px); }
+  .genre-card { width: calc(50% - 7px); height: 90px; }
+}
+
+@media (max-width: 480px) {
+  .genre-card { height: 80px; }
+}
+
+html.is-mobile .genre-card {
+  width: calc(50% - 7px);
+  height: 90px;
 }
 
 .genre-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 32px rgba(0,0,0,0.4);
 }
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.genre-card, .featured-card, .discover-row {
+  animation: cardIn 0.35s ease both;
+}
+
+.genre-card:nth-child(1), .featured-card:nth-child(1), .discover-row:nth-child(1) { animation-delay: 0.035s; }
+.genre-card:nth-child(2), .featured-card:nth-child(2), .discover-row:nth-child(2) { animation-delay: 0.07s; }
+.genre-card:nth-child(3), .featured-card:nth-child(3), .discover-row:nth-child(3) { animation-delay: 0.105s; }
+.genre-card:nth-child(4), .featured-card:nth-child(4), .discover-row:nth-child(4) { animation-delay: 0.14s; }
+.genre-card:nth-child(5), .featured-card:nth-child(5), .discover-row:nth-child(5) { animation-delay: 0.175s; }
+.genre-card:nth-child(6), .featured-card:nth-child(6), .discover-row:nth-child(6) { animation-delay: 0.21s; }
+.genre-card:nth-child(7), .featured-card:nth-child(7), .discover-row:nth-child(7) { animation-delay: 0.245s; }
+.genre-card:nth-child(8), .featured-card:nth-child(8), .discover-row:nth-child(8) { animation-delay: 0.28s; }
+.genre-card:nth-child(9), .featured-card:nth-child(9), .discover-row:nth-child(9) { animation-delay: 0.315s; }
+.genre-card:nth-child(10), .featured-card:nth-child(10), .discover-row:nth-child(10) { animation-delay: 0.35s; }
+.genre-card:nth-child(11), .featured-card:nth-child(11), .discover-row:nth-child(11) { animation-delay: 0.385s; }
+.genre-card:nth-child(12), .featured-card:nth-child(12), .discover-row:nth-child(12) { animation-delay: 0.42s; }
 
 .genre-card.active {
   border-color: var(--primary, #6c5ce7);
@@ -2654,67 +2689,4 @@ html.is-mobile .app {
   padding: 40px 20px;
   color: var(--text-2);
   font-size: 14px;
-}
-
-/* ══════════════════════════════════════════════════════
-   GENRE CARDS (imageless, color-based)
-════════════════════════════════════════════════════════ */
-
-.genre-card {
-  flex: 0 0 auto;
-  width: 140px;
-  height: 180px;
-  border-radius: var(--radius-lg);
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: flex-end;
-  padding: 12px;
-}
-
-.genre-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
-}
-
-.genre-card .genre-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
-  z-index: 2;
-}
-
-/* ══════════════════════════════════════════════════════
-   GENRE CARDS — MOBILE SPACING FIX
-   A later, unconditional .genre-card rule above (width:140px,
-   height:180px) was overriding the earlier responsive
-   @media width, so cards never actually recalculated to fit
-   the screen. This restores correct 2-per-row sizing on
-   narrow viewports and mobile devices.
-════════════════════════════════════════════════════════ */
-@media (max-width: 700px) {
-  .genre-card {
-    width: calc(50% - 7px);
-    height: 130px;
-  }
-}
-
-@media (max-width: 480px) {
-  .genre-card {
-    height: 110px;
-    padding: 10px;
-  }
-
-  .genre-card .genre-name {
-    font-size: 13px;
-  }
-}
-
-html.is-mobile .genre-card {
-  width: calc(50% - 7px);
-  height: 130px;
 }
