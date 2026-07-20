@@ -108,18 +108,6 @@ function isValidImageUrl(url) {
 
 const FALLBACK_ARTWORK = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyMDAgMjAwJz48cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgZmlsbD0nIzFhMWEyZScvPjxjaXJjbGUgY3g9JzEwMCcgY3k9JzEwMCcgcj0nOTAnIGZpbGw9JyMxMjEyMmEnLz48cGF0aCBkPSdNODUgNjUgTDg1IDEzMCBRODUgMTQyIDc1IDE0NSBRNTggMTUwIDU1IDEzOCBRNTIgMTI1IDY4IDEyMCBMNzUgMTE4IEw3NSA3NSBMMTI1IDYyIEwxMjUgMTA4IFExMjUgMTIwIDExNSAxMjMgUTk4IDEyOCA5NSAxMTYgUTkyIDEwMyAxMDggOTggTDExNSA5NiBMMTE1IDU4IFonIGZpbGw9JyNlMGUwZTAnLz48L3N2Zz4=';
 
-/**
- * PATCH FIX #1: Improved getArtworkStyle with proper CSS escaping
- * Handles URLs with special characters and ensures proper CSS quoting
- */
-function getArtworkStyle(track) {
-  if (isValidImageUrl(track.artwork)) {
-    // Properly escape URL for use in CSS url() function
-    const escapedUrl = track.artwork.replace(/['"]/g, '\\$&');
-    return 'background-image:url("' + escapedUrl + '");background-size:cover;background-position:center;';
-  }
-  return 'background-image:url("' + FALLBACK_ARTWORK + '");background-size:cover;background-position:center;';
-}
 
 function toast(message, opts) {
   opts = opts || {};
@@ -323,17 +311,16 @@ async function loadByTag(tag) {
 }
 
 /**
- * PATCH FIX #2: Featured cards now properly use background-image
- * Changed from img element to div with background to match CSS structure
- */
 function renderFeatured(tracks) {
   if (!featuredGrid) return;
   if (!tracks.length) {
     featuredGrid.innerHTML = '<div class="discover-empty">No featured tracks available</div>';
     return;
   }
-  featuredGrid.innerHTML = tracks.slice(0, 3).map((t, i) => {
-    return '<div class="featured-card" data-uri="' + escapeHtml(t.uri || '') + '" style="' + getArtworkStyle(t) + '">' +
+  featuredGrid.innerHTML = tracks.slice(0, 3).map((t) => {
+    const src = isValidImageUrl(t.artwork) ? escapeHtml(t.artwork) : FALLBACK_ARTWORK;
+    return '<div class="featured-card" data-uri="' + escapeHtml(t.uri || '') + '">' +
+    '<img class="feat-bg" src="' + src + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_ARTWORK;">' +
     '<div class="feat-overlay"></div>' +
     '<div class="feat-info"><div class="feat-title">' + escapeHtml(t.title) + '</div><div class="feat-artist">' + escapeHtml(t.artist) + '</div></div>' +
     '</div>';
@@ -362,7 +349,7 @@ function renderDiscover(allTracks, page) {
 
   discoverList.innerHTML = pageTracks.map((t) => {
     return '<div class="discover-row" data-uri="' + escapeHtml(t.uri || '') + '">' +
-    '<div class="dr-art" style="' + getArtworkStyle(t) + '"></div>' +
+    '<img class="dr-art" src="' + (isValidImageUrl(t.artwork) ? escapeHtml(t.artwork) : FALLBACK_ARTWORK) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_ARTWORK;">' +
     '<div class="dr-info"><div class="dr-title">' + escapeHtml(t.title) + '</div><div class="dr-artist">' + escapeHtml(t.artist) + '</div></div>' +
     '<div class="dr-actions">' +
     '<span class="dr-dur">' + escapeHtml(t.durationFmt || "3:45") + '</span>' +
@@ -419,7 +406,8 @@ function renderQueueView() {
     html += '<div class="qv-header"><span class="qv-guild">' + escapeHtml(player.guildName || 'Unknown') + '</span>';
     html += '<span class="cc-badge ' + (player.playing && !player.paused ? 'badge-playing' : player.paused ? 'badge-paused' : 'badge-idle') + '">' + (player.playing && !player.paused ? 'On Air' : player.paused ? 'Paused' : 'Idle') + '</span></div>';
     if (track) {
-      html += '<div class="qv-now"><div class="qv-art" style="' + getArtworkStyle(track) + '"></div>';
+      const qvSrc = isValidImageUrl(track.artwork) ? escapeHtml(track.artwork) : FALLBACK_ARTWORK;
+      html += '<div class="qv-now"><img class="qv-art" src="' + qvSrc + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_ARTWORK;">';
       html += '<div><div class="qv-title">' + escapeHtml(track.title) + '</div><div class="qv-author">' + escapeHtml(track.author) + '</div></div></div>';
     }
     const qTracks = player.queue || [];
