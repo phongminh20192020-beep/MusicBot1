@@ -90,6 +90,7 @@ const GENRES = [
   { name: "Chillhop",    tag: "chillhop",   color: "#3f9e7f" },
   { name: "Britpop",     tag: "britpop",    color: "#d9822b" },
   { name: "K-Pop",       tag: "k-pop",      color: "#e0518f" },
+  { name: "V-Pop",       tag: "v-pop",      color: "#f2b134" },
   { name: "Pop",         tag: "pop",        color: "#4f6fd9" },
   { name: "Reggaeton",   tag: "reggaeton",  color: "#d94f4f" },
   { name: "Rock",        tag: "rock",       color: "#565a63" },
