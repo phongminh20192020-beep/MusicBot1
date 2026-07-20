@@ -524,17 +524,25 @@ function startDashboard(client) {
   });
 
   // ─── Last.fm Discovery ──────────────────────────────
+  // Paginates at the Last.fm API level (10 tracks per page) so each page
+  // only fetches/enriches artwork for the 10 tracks it actually needs.
+  const DISCOVER_PAGE_SIZE = 10;
+  const MAX_DISCOVER_PAGES = 5; // sanity cap — Last.fm can report huge totals
+
   app.get("/api/lastfm/trending", requireAuth, async (req, res) => {
     try {
-      console.log("[Dashboard] Fetching Last.fm trending...");
-      const data = await lastfmFetch("chart.gettoptracks", { limit: "20" });
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      console.log("[Dashboard] Fetching Last.fm trending, page", page);
+      const data = await lastfmFetch("chart.gettoptracks", { limit: String(DISCOVER_PAGE_SIZE), page: String(page) });
       const raw = data.tracks?.track || [];
+      const attr = data.tracks?.["@attr"] || {};
       console.log("[Dashboard] Last.fm returned", raw.length, "tracks");
-      let tracks = raw.slice(0, 20).map(lastfmTrackToJSON).filter(Boolean);
+      let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
       console.log("[Dashboard] Parsed", tracks.length, "valid tracks");
-      tracks = await enrichTracksWithArtwork(client, tracks, 10);
-      console.log("[Dashboard] Enriched first 10 of", tracks.length, "tracks with artwork");
-      res.json({ tracks });
+      tracks = await enrichTracksWithArtwork(client, tracks, DISCOVER_PAGE_SIZE);
+      console.log("[Dashboard] Enriched", tracks.length, "tracks with artwork for page", page);
+      const totalPages = Math.min(MAX_DISCOVER_PAGES, Math.max(1, parseInt(attr.totalPages, 10) || 1));
+      res.json({ tracks, page, totalPages });
     } catch (err) {
       console.error("[Dashboard] Last.fm trending error:", err.message);
       res.status(500).json({ error: err.message });
@@ -545,15 +553,18 @@ function startDashboard(client) {
     try {
       const tag = (req.query.tag || "").toString().trim();
       if (!tag) return res.status(400).json({ error: "tag is required" });
-      console.log("[Dashboard] Fetching Last.fm tag:", tag);
-      const data = await lastfmFetch("tag.gettoptracks", { tag, limit: "20" });
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      console.log("[Dashboard] Fetching Last.fm tag:", tag, "page", page);
+      const data = await lastfmFetch("tag.gettoptracks", { tag, limit: String(DISCOVER_PAGE_SIZE), page: String(page) });
       const raw = data.tracks?.track || [];
+      const attr = data.tracks?.["@attr"] || {};
       console.log("[Dashboard] Last.fm tag returned", raw.length, "tracks");
-      let tracks = raw.slice(0, 20).map(lastfmTrackToJSON).filter(Boolean);
+      let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
       console.log("[Dashboard] Parsed", tracks.length, "valid tracks");
-      tracks = await enrichTracksWithArtwork(client, tracks, 10);
-      console.log("[Dashboard] Enriched first 10 of", tracks.length, "tracks with artwork");
-      res.json({ tracks });
+      tracks = await enrichTracksWithArtwork(client, tracks, DISCOVER_PAGE_SIZE);
+      console.log("[Dashboard] Enriched", tracks.length, "tracks with artwork for page", page);
+      const totalPages = Math.min(MAX_DISCOVER_PAGES, Math.max(1, parseInt(attr.totalPages, 10) || 1));
+      res.json({ tracks, page, totalPages });
     } catch (err) {
       console.error("[Dashboard] Last.fm tag error:", err.message);
       res.status(500).json({ error: err.message });

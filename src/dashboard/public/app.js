@@ -52,8 +52,8 @@ let activeGuildId = null;
 let currentView = "home";
 
 // Discover pagination state
-let discoverAllTracks = [];   // all fetched tracks (up to 20)
-let discoverPage = 0;         // 0 = tracks 1-10, 1 = tracks 11-20
+let discoverAllTracks = [];   // only used for local (search) pagination
+let discoverPage = 0;         // trending/tag mode: 1-based page from server. search mode: 0-based index.
 const PAGE_SIZE = 10;
 
 // ── Genre Data (Last.fm tag names) ───────────────────
@@ -283,6 +283,14 @@ function shadeColor(hex, percent) {
 // ── Discovery ────────────────────────────────────────
 const discoverTitleText = $("#discover-title-text");
 
+// discoverMode: 'trending' | 'tag' | 'search'
+// For 'trending'/'tag', each page is fetched fresh from the server (10 tracks + artwork),
+// and the previous page's DOM (and its images) is discarded when we render the new page.
+// For 'search', results come back as one batch and are paginated locally.
+let discoverMode = 'trending';
+let discoverTag = '';
+let discoverTotalPages = 1;
+
 function showSkeletons() {
   if (featuredGrid) featuredGrid.innerHTML = Array(3).fill(0).map(() => '<div class="skeleton featured-card"></div>').join('');
   if (discoverList) discoverList.innerHTML = Array(10).fill(0).map(() => '<div class="skeleton discover-row" style="aspect-ratio:1/1.35;"></div>').join('');
@@ -293,18 +301,21 @@ function setLoadingState(isLoading) {
   if (discoverLoading) discoverLoading.classList.toggle('hidden', !isLoading);
 }
 
-async function loadDiscovery() {
+async function loadDiscovery(page = 1) {
+  discoverMode = 'trending';
+  discoverTag = '';
   if (discoverTitleText) discoverTitleText.textContent = "Discover new music";
   showSkeletons();
   setLoadingState(true);
   try {
-    const res = await apiFetch("/api/lastfm/trending");
+    const res = await apiFetch("/api/lastfm/trending?page=" + page);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    discoverAllTracks = data.tracks || [];
-    discoverPage = 0;
-    renderFeatured(discoverAllTracks.slice(0, 3));
-    renderDiscover(discoverAllTracks, 0);
+    const tracks = data.tracks || [];
+    discoverPage = data.page || page;
+    discoverTotalPages = data.totalPages || 1;
+    if (page === 1) renderFeatured(tracks.slice(0, 3));
+    renderDiscover(tracks);
   } catch (e) {
     featuredGrid.innerHTML = '<div class="discover-empty">Error loading trending tracks</div>';
     discoverList.innerHTML = '';
@@ -314,18 +325,21 @@ async function loadDiscovery() {
   }
 }
 
-async function loadByTag(tag) {
+async function loadByTag(tag, page = 1) {
+  discoverMode = 'tag';
+  discoverTag = tag;
   if (discoverTitleText) discoverTitleText.textContent = "Discover new music";
   showSkeletons();
   setLoadingState(true);
   try {
-    const res = await apiFetch("/api/lastfm/tag?tag=" + encodeURIComponent(tag));
+    const res = await apiFetch("/api/lastfm/tag?tag=" + encodeURIComponent(tag) + "&page=" + page);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    discoverAllTracks = data.tracks || [];
-    discoverPage = 0;
-    renderFeatured(discoverAllTracks.slice(0, 3));
-    renderDiscover(discoverAllTracks, 0);
+    const tracks = data.tracks || [];
+    discoverPage = data.page || page;
+    discoverTotalPages = data.totalPages || 1;
+    if (page === 1) renderFeatured(tracks.slice(0, 3));
+    renderDiscover(tracks);
   } catch (e) {
     featuredGrid.innerHTML = '<div class="discover-empty">Error loading genre tracks</div>';
     discoverList.innerHTML = '';
@@ -355,23 +369,20 @@ function renderFeatured(tracks) {
 }
 
 /**
- * PATCH FIX #3: Discover rows with proper HTML escaping + pagination
+ * Renders exactly the tracks it's given as one page — no internal slicing.
+ * Replacing discoverList.innerHTML drops the previous page's <img> elements
+ * from the DOM, so the browser frees those images from memory/decoded cache.
  */
-function renderDiscover(allTracks, page) {
-  if (page === undefined) page = discoverPage;
+function renderDiscover(tracks) {
   if (!discoverList) return;
-  const total = allTracks.length;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
-  const start = page * PAGE_SIZE;
-  const pageTracks = allTracks.slice(start, start + PAGE_SIZE);
 
-  if (!pageTracks.length) {
+  if (!tracks.length) {
     discoverList.innerHTML = '<div class="discover-empty">No tracks found</div>';
     if (discoverPagination) discoverPagination.classList.add('hidden');
     return;
   }
 
-  discoverList.innerHTML = pageTracks.map((t) => {
+  discoverList.innerHTML = tracks.map((t) => {
     const src = isValidImageUrl(t.artwork) ? escapeHtml(t.artwork) : FALLBACK_ARTWORK;
     return '<div class="discover-row" data-uri="' + escapeHtml(t.uri || '') + '">' +
       '<div class="dr-art-wrap">' +
@@ -405,16 +416,23 @@ function renderDiscover(allTracks, page) {
     if (moreBtn) moreBtn.addEventListener('click', () => playUri(row.dataset.uri, row.querySelector('.dr-title').textContent));
   });
 
-  // Update pagination controls
-  if (discoverPagination) {
-    if (totalPages > 1) {
-      discoverPagination.classList.remove('hidden');
-      if (dpLabel) dpLabel.textContent = (page + 1) + ' / ' + totalPages;
-      if (dpPrev)  dpPrev.disabled  = page <= 0;
-      if (dpNext)  dpNext.disabled  = page >= totalPages - 1;
-    } else {
-      discoverPagination.classList.add('hidden');
-    }
+  updatePaginationUI();
+}
+
+function updatePaginationUI() {
+  if (!discoverPagination) return;
+  const totalPages = discoverMode === 'search'
+    ? Math.max(1, Math.ceil(discoverAllTracks.length / PAGE_SIZE))
+    : discoverTotalPages;
+  const page = discoverMode === 'search' ? discoverPage + 1 : discoverPage; // both 1-based for display
+
+  if (totalPages > 1) {
+    discoverPagination.classList.remove('hidden');
+    if (dpLabel) dpLabel.textContent = page + ' / ' + totalPages;
+    if (dpPrev)  dpPrev.disabled  = page <= 1;
+    if (dpNext)  dpNext.disabled  = page >= totalPages;
+  } else {
+    discoverPagination.classList.add('hidden');
   }
 }
 
@@ -650,6 +668,9 @@ async function searchLastFm(query) {
     if (!tracks.length) {
       toast("No results found", {type:"error"});
       renderFeatured([]);
+      discoverMode = 'search';
+      discoverAllTracks = [];
+      discoverPage = 0;
       renderDiscover([]);
       return;
     }
@@ -663,16 +684,14 @@ async function searchLastFm(query) {
       return aHasOfficial - bHasOfficial;
     });
 
-    // Show top 3 as featured cards; paginate the rest
+    // Show top 3 as featured cards; paginate the rest locally
+    discoverMode = 'search';
     discoverAllTracks = tracks;
     discoverPage = 0;
     renderFeatured(tracks.slice(0, 3));
-    renderDiscover(tracks, 0);
+    renderDiscover(tracks.slice(0, PAGE_SIZE));
 
-    const discoverTitle = discoverList?.previousElementSibling;
-    if (discoverTitle && discoverTitle.classList.contains('discover-title')) {
-      discoverTitle.textContent = "Search Results (" + tracks.length + ")";
-    }
+    if (discoverTitleText) discoverTitleText.textContent = "Search Results (" + tracks.length + ")";
   } catch (e) {
     toast("Search error: " + e.message, {type:"error"});
     if (featuredGrid) featuredGrid.innerHTML = '<div class="discover-empty">Search error: ' + escapeHtml(e.message) + '</div>';
@@ -693,20 +712,38 @@ globalSearchInput.addEventListener("keydown", e => {
 // ── Discover pagination controls ─────────────────────
 if (dpPrev) {
   dpPrev.addEventListener('click', () => {
-    if (discoverPage > 0) {
-      discoverPage--;
-      renderDiscover(discoverAllTracks, discoverPage);
-      discoverList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (discoverMode === 'search') {
+      if (discoverPage > 0) {
+        discoverPage--;
+        const start = discoverPage * PAGE_SIZE;
+        renderDiscover(discoverAllTracks.slice(start, start + PAGE_SIZE));
+        discoverList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } else {
+      if (discoverPage > 1) {
+        const prevPage = discoverPage - 1;
+        const loader = discoverMode === 'tag' ? loadByTag(discoverTag, prevPage) : loadDiscovery(prevPage);
+        loader.then(() => discoverList.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      }
     }
   });
 }
 if (dpNext) {
   dpNext.addEventListener('click', () => {
-    const totalPages = Math.ceil(discoverAllTracks.length / PAGE_SIZE);
-    if (discoverPage < totalPages - 1) {
-      discoverPage++;
-      renderDiscover(discoverAllTracks, discoverPage);
-      discoverList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (discoverMode === 'search') {
+      const totalPages = Math.ceil(discoverAllTracks.length / PAGE_SIZE);
+      if (discoverPage < totalPages - 1) {
+        discoverPage++;
+        const start = discoverPage * PAGE_SIZE;
+        renderDiscover(discoverAllTracks.slice(start, start + PAGE_SIZE));
+        discoverList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } else {
+      if (discoverPage < discoverTotalPages) {
+        const nextPage = discoverPage + 1;
+        const loader = discoverMode === 'tag' ? loadByTag(discoverTag, nextPage) : loadDiscovery(nextPage);
+        loader.then(() => discoverList.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      }
     }
   });
 }
