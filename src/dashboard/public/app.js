@@ -109,6 +109,7 @@ function isValidImageUrl(url) {
 }
 
 const FALLBACK_ARTWORK = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyMDAgMjAwJz48cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgZmlsbD0nIzFhMWEyZScvPjxjaXJjbGUgY3g9JzEwMCcgY3k9JzEwMCcgcj0nOTAnIGZpbGw9JyMxMjEyMmEnLz48cGF0aCBkPSdNODUgNjUgTDg1IDEzMCBRODUgMTQyIDc1IDE0NSBRNTggMTUwIDU1IDEzOCBRNTIgMTI1IDY4IDEyMCBMNzUgMTE4IEw3NSA3NSBMMTI1IDYyIEwxMjUgMTA4IFExMjUgMTIwIDExNSAxMjMgUTk4IDEyOCA5NSAxMTYgUTkyIDEwMyAxMDggOTggTDExNSA5NiBMMTE1IDU4IFonIGZpbGw9JyNlMGUwZTAnLz48L3N2Zz4=';
+const NO_SONG_ARTWORK = 'https://i.pinimg.com/1200x/f1/91/a4/f191a4786289ade562884722ef784cff.jpg';
 
 
 function toast(message, opts) {
@@ -599,7 +600,9 @@ function collapseBottomPlayer() {
   bpArtist.textContent = "Select a server to sync";
   bpGuild.textContent = "No guild";
   bpFill.style.width = "0%";
-  bpArt.src = '';
+  bpArt.src = NO_SONG_ARTWORK;
+  bpArt.style.opacity = '1';
+  bpArt.style.display = 'block';
 }
 
 bpPlaypause.addEventListener('click', () => {
