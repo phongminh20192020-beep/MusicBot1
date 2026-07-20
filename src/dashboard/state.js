@@ -38,6 +38,7 @@ function playerToJSON(client, player) {
     repeatMode:   player.repeatMode || "off",
     afk:          !!player.get?.("afk"),
     current:      trackToJSON(player.queue?.current),
+    previous:     (player.queue?.previous || []).slice(0, 50).map(trackToJSON),
     queue:        (player.queue?.tracks || []).slice(0, 50).map(trackToJSON),
     queueLength:  player.queue?.tracks?.length || 0,
   };
