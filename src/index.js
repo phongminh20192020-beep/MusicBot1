@@ -4,7 +4,7 @@ const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require("discord
 const { LavalinkManager } = require("lavalink-client");
 const fs   = require("fs");
 const path = require("path");
-const { formatDuration, progressBar, resolveSpotify, getSpotifyRecommendations, extractSpotifyId, setVoiceStatus, clearVoiceStatus } = require("./utils/helpers");
+const { formatDuration, progressBar, resolveSpotify, pickBestTrackMatch, getSpotifyRecommendations, extractSpotifyId, setVoiceStatus, clearVoiceStatus } = require("./utils/helpers");
 const { purgeExpired } = require("./utils/queueStore");
 const mvStreamer = require("./stream/mvStreamer");
 const { startDashboard } = require("./dashboard/server");
@@ -233,11 +233,12 @@ async function searchReplacement(player, failedTrack, sources) {
   for (const source of sources) {
     try {
       const res = await player.search({ query, source }, failedTrack.requester);
-      if (!res?.tracks?.length) continue;
-      return (
-        res.tracks.find(t => Math.abs((t.info.duration || 0) - targetDuration) < 5000) ||
-        res.tracks[0]
-      );
+      if (!res?.tracks?.length) {
+        console.log(`[Lavalink] Replacement search on ${source} returned no results for "${query}"`);
+        continue;
+      }
+      console.log(`[Lavalink] Replacement search on ${source} found ${res.tracks.length} result(s) for "${query}"`);
+      return pickBestTrackMatch(res.tracks, targetDuration);
     } catch (err) {
       console.error(`[Lavalink] Replacement search failed on ${source}:`, err.message);
     }
@@ -285,7 +286,7 @@ client.lavalink
     clearNpInterval(guildId);
 
     const channel      = client.channels.cache.get(player.textChannelId);
-    const isLoginError = /sign in|login|requires login|bot|cookie|403/i.test(reason);
+    const isLoginError = /sign in|login|requires login|bot|cookie|403|unavailable|not available|restricted|private|removed|blocked|copyright/i.test(reason);
 
     const failCount = (client.errorCounts.get(guildId) || 0) + 1;
     client.errorCounts.set(guildId, failCount);
@@ -303,10 +304,11 @@ client.lavalink
     if (track && trackKey && !retriedSet.has(trackKey)) {
       retriedSet.add(trackKey);
 
-      if (isLoginError) {
-        console.log(`[Lavalink] Login error — retrying "${track.info.title}" via youtube-source fallback`);
-        channel?.send(`⚠️ **${track.info.title}** hit a login wall — trying another source...`).catch(() => {});
-      }
+      // Always log/announce the retry attempt — previously this was silent
+      // unless the error text matched a narrow "login" regex, which made it
+      // look like the bot skipped straight away with no retry at all.
+      console.log(`[Lavalink] "${track.info.title}" failed (${reason}) — searching for a replacement...`);
+      channel?.send(`⚠️ **${track.info.title}** failed to play (${reason}) — trying another source...`).catch(() => {});
 
       const sources     = isLoginError ? ["ytsearch", "ytmsearch"] : ["ytmsearch", "ytsearch"];
       const replacement = await searchReplacement(player, track, sources);
@@ -317,6 +319,8 @@ client.lavalink
         await player.skip(0, false).catch(err => console.error("[Lavalink] skip-to-retry failed:", err.message));
         return;
       }
+
+      console.warn(`[Lavalink] No replacement found for "${track.info.title}" — giving up and skipping.`);
     }
 
     channel?.send(`⚠️ Couldn't play **${track?.info?.title || "that track"}** — skipping.`).catch(() => {});
