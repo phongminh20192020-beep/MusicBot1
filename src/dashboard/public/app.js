@@ -265,7 +265,7 @@ function renderGenres() {
 // ── Discovery ────────────────────────────────────────
 function showSkeletons() {
   if (featuredGrid) featuredGrid.innerHTML = Array(3).fill(0).map(() => '<div class="skeleton featured-card"></div>').join('');
-  if (discoverList) discoverList.innerHTML = Array(5).fill(0).map(() => '<div class="skeleton discover-row" style="height:48px;"></div>').join('');
+  if (discoverList) discoverList.innerHTML = Array(10).fill(0).map(() => '<div class="skeleton discover-row" style="aspect-ratio:1/1.35;"></div>').join('');
 }
 
 async function loadDiscovery() {
@@ -347,21 +347,35 @@ function renderDiscover(allTracks, page) {
   }
 
   discoverList.innerHTML = pageTracks.map((t) => {
+    const src = isValidImageUrl(t.artwork) ? escapeHtml(t.artwork) : FALLBACK_ARTWORK;
     return '<div class="discover-row" data-uri="' + escapeHtml(t.uri || '') + '">' +
-    '<img class="dr-art" src="' + (isValidImageUrl(t.artwork) ? escapeHtml(t.artwork) : FALLBACK_ARTWORK) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_ARTWORK;">' +
-    '<div class="dr-info"><div class="dr-title">' + escapeHtml(t.title) + '</div><div class="dr-artist">' + escapeHtml(t.artist) + '</div></div>' +
-    '<div class="dr-actions">' +
-    '<span class="dr-dur">' + escapeHtml(t.durationFmt || "3:45") + '</span>' +
-    '<button class="dr-btn dr-like" title="Like">♡</button>' +
-    '<button class="dr-btn dr-more" title="Add to queue">+</button>' +
-    '</div></div>';
+      '<div class="dr-art-wrap">' +
+        '<img class="dr-art" src="' + src + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_ARTWORK;">' +
+        '<button class="dr-play" title="Play">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>' +
+        '</button>' +
+      '</div>' +
+      '<div class="dr-info">' +
+        '<div class="dr-title">' + escapeHtml(t.title) + '</div>' +
+        '<div class="dr-artist">' + escapeHtml(t.artist) + '</div>' +
+        '<div class="dr-meta-row">' +
+          '<span class="dr-dur">' + escapeHtml(t.durationFmt || "3:45") + '</span>' +
+          '<span style="display:flex;gap:2px;">' +
+            '<button class="dr-btn dr-like" title="Like">♡</button>' +
+            '<button class="dr-btn dr-more" title="Add to queue">+</button>' +
+          '</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }).join('');
 
   discoverList.querySelectorAll('.discover-row').forEach(row => {
     row.addEventListener('click', e => {
-      if (e.target.closest('.dr-btn')) return;
+      if (e.target.closest('.dr-btn') || e.target.closest('.dr-play')) return;
       playUri(row.dataset.uri, row.querySelector('.dr-title').textContent);
     });
+    const playBtn = row.querySelector('.dr-play');
+    if (playBtn) playBtn.addEventListener('click', () => playUri(row.dataset.uri, row.querySelector('.dr-title').textContent));
     const moreBtn = row.querySelector('.dr-more');
     if (moreBtn) moreBtn.addEventListener('click', () => playUri(row.dataset.uri, row.querySelector('.dr-title').textContent));
   });

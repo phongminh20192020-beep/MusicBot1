@@ -1943,42 +1943,92 @@ input {
 /* ── Discover List ──────────────────────────────── */
 
 .discover-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 1100px) {
+  .discover-list { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (max-width: 860px) {
+  .discover-list { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .discover-list { grid-template-columns: repeat(2, 1fr); }
 }
 
 .discover-row {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
-  border-radius: var(--radius);
+  flex-direction: column;
+  padding: 12px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: background 0.15s ease;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 
 .discover-row:hover {
   background: var(--surface-2);
+  border-color: var(--border);
+  transform: translateY(-2px);
+}
+
+.discover-row .dr-art-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 10px;
+  background: var(--surface-3);
 }
 
 .discover-row .dr-art {
-  width: 48px;
-  height: 48px;
-  border-radius: 6px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  background: var(--surface-3);
-  flex-shrink: 0;
+  display: block;
+}
+
+.discover-row .dr-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary, #6c5ce7);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.discover-row:hover .dr-play {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.discover-row .dr-play:hover {
+  filter: brightness(1.1);
 }
 
 .discover-row .dr-info {
-  flex: 1;
   min-width: 0;
 }
 
 .discover-row .dr-title {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -1988,28 +2038,28 @@ input {
 .discover-row .dr-artist {
   font-size: 12px;
   color: var(--text-2);
-  margin-top: 2px;
+  margin-top: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.discover-row .dr-actions {
+.discover-row .dr-meta-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
+  justify-content: space-between;
+  margin-top: 6px;
 }
 
 .discover-row .dr-dur {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 
 .discover-row .dr-btn {
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   border: none;
   background: transparent;
