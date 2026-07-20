@@ -310,7 +310,6 @@ async function loadByTag(tag) {
   }
 }
 
-/**
 function renderFeatured(tracks) {
   if (!featuredGrid) return;
   if (!tracks.length) {
