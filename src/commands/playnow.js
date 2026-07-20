@@ -1,7 +1,7 @@
 "use strict";
 
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const { formatDuration, resolveSpotify } = require("../utils/helpers");
+const { formatDuration, resolveSpotify, pickBestTrackMatch } = require("../utils/helpers");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -42,6 +42,7 @@ module.exports = {
     let query            = interaction.options.getString("query");
     const isSpotifyTrack = /spotify\.com\/track\//.test(query);
     const isUrl          = /^https?:\/\//.test(query);
+    let   targetDuration = 0;
 
     // ── Detect if the node has LavaSrc ────────────────────────────────────────
     const nodeInfo   = player.node?.info;
@@ -92,6 +93,7 @@ module.exports = {
         const data = await resolveSpotify(query);
         if (!data?.tracks?.[0]) return interaction.editReply("❌ Couldn't resolve that Spotify track.");
         query = data.tracks[0].query;
+        targetDuration = data.tracks[0].duration || 0;
       } catch (err) {
         console.error("[PlayNow] Spotify resolve error:", err.message);
         return interaction.editReply("❌ Failed to fetch Spotify data. Try again later.");
@@ -105,7 +107,7 @@ module.exports = {
     if (!res?.tracks?.length || res.loadType === "empty" || res.loadType === "error")
       return interaction.editReply("❌ No results found.");
 
-    const track = res.tracks[0];
+    const track = pickBestTrackMatch(res.tracks, targetDuration);
     player.queue.tracks.unshift(track);
 
     if (player.playing || player.paused) {

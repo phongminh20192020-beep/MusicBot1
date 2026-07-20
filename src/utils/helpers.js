@@ -84,14 +84,14 @@ async function resolveSpotify(url) {
     return {
       type:   "track",
       name:   d.name,
-      tracks: [{ query: `${artist} ${d.name}`.trim(), title: d.name, artist }],
+      tracks: [{ query: `${artist} ${d.name}`.trim(), title: d.name, artist, duration: d.duration_ms || 0 }],
     };
   }
 
   if (playlistMatch) {
     // Paginate through all tracks (Spotify returns max 100 per page)
     const id     = playlistMatch[1];
-    let   url    = `https://api.spotify.com/v1/playlists/${id}?fields=name,tracks.items(track(name,artists)),tracks.next,tracks.total`;
+    let   url    = `https://api.spotify.com/v1/playlists/${id}?fields=name,tracks.items(track(name,artists,duration_ms)),tracks.next,tracks.total`;
     const res    = await fetch(url, { headers });
     if (!res.ok) throw new Error(`Spotify playlist fetch failed (${res.status})`);
     const d      = await res.json();
@@ -111,7 +111,7 @@ async function resolveSpotify(url) {
       .filter(Boolean)
       .map(t => {
         const artist = t.artists?.[0]?.name ?? "";
-        return { query: `${artist} ${t.name}`.trim(), title: t.name, artist };
+        return { query: `${artist} ${t.name}`.trim(), title: t.name, artist, duration: t.duration_ms || 0 };
       });
 
     return { type: "playlist", name: d.name, tracks };
@@ -126,7 +126,7 @@ async function resolveSpotify(url) {
     const d      = await res.json();
     const tracks = (d.tracks?.items ?? []).map(t => {
       const artist = t.artists?.[0]?.name ?? "";
-      return { query: `${artist} ${t.name}`.trim(), title: t.name, artist };
+      return { query: `${artist} ${t.name}`.trim(), title: t.name, artist, duration: t.duration_ms || 0 };
     });
     return { type: "album", name: d.name, tracks };
   }
@@ -191,11 +191,37 @@ async function clearVoiceStatus(client, channelId) {
     .catch(() => {});
 }
 
+/**
+ * Pick the best match from a list of Lavalink search results for a given
+ * target duration (ms). Prefers the closest duration within a 5s tolerance;
+ * falls back to the top search result if nothing is close enough. This
+ * avoids blindly trusting the #1 YouTube Music result, which is frequently
+ * a full album, a live version, a sped-up reupload, or otherwise the wrong
+ * track — the same duration-matching logic already used for error retries.
+ */
+function pickBestTrackMatch(tracks, targetDurationMs) {
+  if (!tracks?.length) return null;
+  if (!targetDurationMs) return tracks[0];
+
+  let best = null;
+  let bestDiff = Infinity;
+  for (const t of tracks) {
+    const diff = Math.abs((t.info?.duration || 0) - targetDurationMs);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = t;
+    }
+  }
+
+  return bestDiff <= 5000 ? best : tracks[0];
+}
+
 module.exports = {
   formatDuration,
   progressBar,
   getSpotifyToken,
   resolveSpotify,
+  pickBestTrackMatch,
   getSpotifyRecommendations,
   extractSpotifyId,
   setVoiceStatus,

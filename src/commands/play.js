@@ -1,7 +1,7 @@
 "use strict";
 
 const { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ComponentType } = require("discord.js");
-const { formatDuration, resolveSpotify } = require("../utils/helpers");
+const { formatDuration, resolveSpotify, pickBestTrackMatch } = require("../utils/helpers");
 const { loadQueue, deleteQueue }         = require("../utils/queueStore");
 
 module.exports = {
@@ -199,7 +199,7 @@ module.exports = {
 
       // Single track
       if (spotifyData.type === "track") {
-        const { query: ytQuery, title, artist } = spotifyData.tracks[0];
+        const { query: ytQuery, title, artist, duration } = spotifyData.tracks[0];
         const res = await player
           .search({ query: ytQuery, source: "ytmsearch" }, interaction.user)
           .catch(() => null);
@@ -207,7 +207,7 @@ module.exports = {
         if (!res?.tracks?.length)
           return interaction.editReply(`❌ Couldn't find **${title}** on YouTube Music.`);
 
-        const track = res.tracks[0];
+        const track = pickBestTrackMatch(res.tracks, duration);
         player.queue.add(track);
 
         if (!player.playing && !player.paused)
@@ -245,11 +245,12 @@ module.exports = {
 
       (async () => {
         let added = 0;
-        for (const { query: ytQuery, title } of tracks) {
+        for (const { query: ytQuery, title, duration } of tracks) {
           try {
             const res = await player.search({ query: ytQuery, source: "ytmsearch" }, interaction.user);
-            if (res?.tracks?.[0]) {
-              player.queue.add(res.tracks[0]);
+            const match = pickBestTrackMatch(res?.tracks, duration);
+            if (match) {
+              player.queue.add(match);
               added++;
               if (added === 1 && !player.playing && !player.paused)
                 await player.play().catch(err => console.error("[Play] initial play() error:", err.message));
