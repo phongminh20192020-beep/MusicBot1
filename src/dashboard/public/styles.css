@@ -2157,21 +2157,27 @@ input {
   transition: all 0.3s ease;
 }
 
-/* Collapsed state (nothing playing) */
+/* Collapsed state (nothing playing) — keep the bar visible with the
+   "Nothing playing" placeholder instead of shrinking it away */
 .bottom-player.collapsed {
-  height: 4px;
-  border-top: none;
-  background: var(--surface-3);
-  cursor: pointer;
+  height: 80px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  cursor: default;
 }
 
 .bottom-player.collapsed .bp-body {
-  display: none;
+  display: flex;
+  opacity: 0.6;
 }
 
-.bottom-player.collapsed:hover {
-  height: 6px;
-  background: var(--text-3);
+.bottom-player.collapsed .bp-controls,
+.bottom-player.collapsed .bp-progress,
+.bottom-player.collapsed .bp-vol,
+.bottom-player.collapsed .bp-loop,
+.bottom-player.collapsed .bp-shuffle {
+  pointer-events: none;
+  opacity: 0.5;
 }
 
 /* Expanded state */
@@ -2356,11 +2362,6 @@ input {
 /* Adjust main content for bottom player */
 .app {
   padding-bottom: 80px;
-}
-
-.bottom-player.collapsed ~ .app,
-.bottom-player.collapsed + .app {
-  padding-bottom: 4px;
 }
 
 /* ══════════════════════════════════════════════════════
