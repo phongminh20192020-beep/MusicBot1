@@ -2687,3 +2687,34 @@ html.is-mobile .app {
   text-shadow: 0 1px 4px rgba(0,0,0,0.5);
   z-index: 2;
 }
+
+/* ══════════════════════════════════════════════════════
+   GENRE CARDS — MOBILE SPACING FIX
+   A later, unconditional .genre-card rule above (width:140px,
+   height:180px) was overriding the earlier responsive
+   @media width, so cards never actually recalculated to fit
+   the screen. This restores correct 2-per-row sizing on
+   narrow viewports and mobile devices.
+════════════════════════════════════════════════════════ */
+@media (max-width: 700px) {
+  .genre-card {
+    width: calc(50% - 7px);
+    height: 130px;
+  }
+}
+
+@media (max-width: 480px) {
+  .genre-card {
+    height: 110px;
+    padding: 10px;
+  }
+
+  .genre-card .genre-name {
+    font-size: 13px;
+  }
+}
+
+html.is-mobile .genre-card {
+  width: calc(50% - 7px);
+  height: 130px;
+}
