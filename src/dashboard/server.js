@@ -534,9 +534,8 @@ function startDashboard(client) {
       const page = Math.max(1, parseInt(req.query.page, 10) || 1);
       console.log("[Dashboard] Fetching Last.fm trending, page", page);
       const data = await lastfmFetch("chart.gettoptracks", { limit: String(DISCOVER_PAGE_SIZE), page: String(page) });
-      const root = data.tracks || data.toptracks || {};
-      const raw = root.track || [];
-      const attr = root["@attr"] || {};
+      const raw = data.tracks?.track || [];
+      const attr = data.tracks?.["@attr"] || {};
       console.log("[Dashboard] Last.fm returned", raw.length, "tracks");
       let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
       console.log("[Dashboard] Parsed", tracks.length, "valid tracks");
@@ -557,9 +556,8 @@ function startDashboard(client) {
       const page = Math.max(1, parseInt(req.query.page, 10) || 1);
       console.log("[Dashboard] Fetching Last.fm tag:", tag, "page", page);
       const data = await lastfmFetch("tag.gettoptracks", { tag, limit: String(DISCOVER_PAGE_SIZE), page: String(page) });
-      const root = data.tracks || data.toptracks || {};
-      const raw = root.track || [];
-      const attr = root["@attr"] || {};
+      const raw = data.tracks?.track || [];
+      const attr = data.tracks?.["@attr"] || {};
       console.log("[Dashboard] Last.fm tag returned", raw.length, "tracks");
       let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
       console.log("[Dashboard] Parsed", tracks.length, "valid tracks");
