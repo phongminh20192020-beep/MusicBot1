@@ -1813,31 +1813,24 @@ input {
 
 .genres-scroll {
   display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  scrollbar-width: thin;
-}
-
-.genres-scroll::-webkit-scrollbar {
-  height: 4px;
-}
-
-.genres-scroll::-webkit-scrollbar-thumb {
-  background: var(--surface-3);
-  border-radius: 2px;
+  flex-wrap: wrap;
+  gap: 14px;
 }
 
 .genre-card {
   flex: 0 0 auto;
-  width: 140px;
-  height: 180px;
+  width: 150px;
+  height: 100px;
   border-radius: var(--radius-lg);
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   border: 1px solid var(--border);
+}
+
+@media (max-width: 700px) {
+  .genre-card { width: calc(50% - 7px); }
 }
 
 .genre-card:hover {
@@ -1845,11 +1838,16 @@ input {
   box-shadow: 0 12px 32px rgba(0,0,0,0.4);
 }
 
+.genre-card.active {
+  border-color: var(--primary, #6c5ce7);
+  box-shadow: 0 0 0 2px var(--primary, #6c5ce7);
+}
+
 .genre-card::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.7) 100%);
+  background: linear-gradient(160deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.45) 100%);
   z-index: 1;
 }
 
@@ -1862,17 +1860,30 @@ input {
   opacity: 0.8;
 }
 
+.genre-card .genre-note {
+  position: absolute;
+  right: -6px;
+  bottom: -10px;
+  width: 64px;
+  height: 64px;
+  opacity: 0.35;
+  transform: rotate(18deg);
+  z-index: 1;
+  color: rgba(255,255,255,0.9);
+}
+
 .genre-card .genre-name {
   position: absolute;
-  bottom: 12px;
-  left: 12px;
+  top: 12px;
+  left: 14px;
   right: 12px;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: #fff;
   z-index: 2;
   text-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
+
 
 /* ── Featured ───────────────────────────────────── */
 

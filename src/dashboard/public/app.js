@@ -56,18 +56,18 @@ const PAGE_SIZE = 10;
 
 // ── Genre Data (Last.fm tag names) ───────────────────
 const GENRES = [
-  { name: "Lofi",        tag: "lofi" },
-  { name: "Phonk",       tag: "phonk" },
-  { name: "Chillhop",    tag: "chillhop" },
-  { name: "Britpop",     tag: "britpop" },
-  { name: "K-Pop",       tag: "k-pop" },
-  { name: "Pop",         tag: "pop" },
-  { name: "Reggaeton",   tag: "reggaeton" },
-  { name: "Rock",        tag: "rock" },
-  { name: "Electronic",  tag: "electronic" },
-  { name: "Jazz",        tag: "jazz" },
-  { name: "Hip-Hop",     tag: "hip-hop" },
-  { name: "R&B",         tag: "rnb" },
+  { name: "Lofi",        tag: "lofi",       color: "#8e6bd6" },
+  { name: "Phonk",       tag: "phonk",      color: "#c23b6e" },
+  { name: "Chillhop",    tag: "chillhop",   color: "#3f9e7f" },
+  { name: "Britpop",     tag: "britpop",    color: "#d9822b" },
+  { name: "K-Pop",       tag: "k-pop",      color: "#e0518f" },
+  { name: "Pop",         tag: "pop",        color: "#4f6fd9" },
+  { name: "Reggaeton",   tag: "reggaeton",  color: "#d94f4f" },
+  { name: "Rock",        tag: "rock",       color: "#565a63" },
+  { name: "Electronic",  tag: "electronic", color: "#2fb4c9" },
+  { name: "Jazz",        tag: "jazz",       color: "#9a6b3c" },
+  { name: "Hip-Hop",     tag: "hip-hop",    color: "#6c5ce7" },
+  { name: "R&B",         tag: "rnb",        color: "#b13c8f" },
 ];
 
 // ── Helpers ────────────────────────────────────────
@@ -250,16 +250,32 @@ function switchView(view) {
 // ── Genre Rendering ──────────────────────────────────
 function renderGenres() {
   if (!genresScroll) return;
-  genresScroll.innerHTML = GENRES.map((g, i) => {
-    return '<button class="genre-btn" data-tag="' + g.tag + '">' + g.name + '</button>';
+  genresScroll.innerHTML = GENRES.map((g) => {
+    const bg = 'linear-gradient(135deg, ' + g.color + ' 0%, ' + shadeColor(g.color, -25) + ' 100%)';
+    return '<div class="genre-card" data-tag="' + g.tag + '" style="background:' + bg + ';">' +
+      '<div class="genre-name">' + g.name + '</div>' +
+      '<svg class="genre-note" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' +
+    '</div>';
   }).join('');
-  genresScroll.querySelectorAll('.genre-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      genresScroll.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      loadByTag(btn.dataset.tag);
+  genresScroll.querySelectorAll('.genre-card').forEach(card => {
+    card.addEventListener('click', () => {
+      genresScroll.querySelectorAll('.genre-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      loadByTag(card.dataset.tag);
     });
   });
+}
+
+// Darken/lighten a hex color by percent (negative = darker)
+function shadeColor(hex, percent) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  let r = (num >> 16) + Math.round(2.55 * percent);
+  let g = ((num >> 8) & 0x00ff) + Math.round(2.55 * percent);
+  let b = (num & 0x0000ff) + Math.round(2.55 * percent);
+  r = Math.max(0, Math.min(255, r));
+  g = Math.max(0, Math.min(255, g));
+  b = Math.max(0, Math.min(255, b));
+  return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
 }
 
 // ── Discovery ────────────────────────────────────────
