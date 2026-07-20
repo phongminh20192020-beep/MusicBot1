@@ -2365,6 +2365,154 @@ input {
 }
 
 /* ══════════════════════════════════════════════════════
+   BOTTOM PLAYER — MOBILE LAYOUT
+   Triggers on narrow viewports AND when app.js's device
+   detection tags <html class="is-mobile">, whichever fires.
+════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .bottom-player,
+  .bottom-player.collapsed,
+  .bottom-player:not(.collapsed) {
+    height: 64px;
+  }
+
+  .bp-body {
+    height: 64px;
+    padding: 6px 12px 0;
+    gap: 10px;
+    position: relative;
+  }
+
+  .bp-left {
+    flex: 1 1 auto;
+    gap: 10px;
+  }
+
+  .bp-art {
+    width: 40px;
+    height: 40px;
+  }
+
+  .bp-title {
+    font-size: 13px;
+  }
+
+  .bp-artist {
+    font-size: 11px;
+  }
+
+  .bp-center {
+    flex: 0 0 auto;
+    max-width: none;
+    gap: 0;
+  }
+
+  /* Previous doesn't fit (and isn't implemented) — keep play/pause + skip */
+  #bp-prev {
+    display: none;
+  }
+
+  .bp-controls {
+    gap: 10px;
+  }
+
+  /* Progress becomes a slim line pinned to the very top edge of the bar */
+  .bp-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    gap: 0;
+  }
+
+  .bp-time {
+    display: none;
+  }
+
+  .bp-track {
+    height: 3px;
+    border-radius: 0;
+  }
+
+  /* Guild tag, loop, shuffle, volume slider don't fit on a phone-width bar */
+  .bp-right {
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+
+  .bp-guild-tag,
+  .bp-vol,
+  #bp-loop,
+  #bp-shuffle {
+    display: none;
+  }
+
+  .app {
+    padding-bottom: 64px;
+  }
+}
+
+/* Same compact layout when JS device-detection identifies a mobile
+   device even if the viewport happens to be wider (e.g. landscape) */
+html.is-mobile .bottom-player,
+html.is-mobile .bottom-player.collapsed,
+html.is-mobile .bottom-player:not(.collapsed) {
+  height: 64px;
+}
+
+html.is-mobile .bp-body {
+  height: 64px;
+  padding: 6px 12px 0;
+  gap: 10px;
+  position: relative;
+}
+
+html.is-mobile .bp-art {
+  width: 40px;
+  height: 40px;
+}
+
+html.is-mobile .bp-center {
+  flex: 0 0 auto;
+  max-width: none;
+  gap: 0;
+}
+
+html.is-mobile #bp-prev {
+  display: none;
+}
+
+html.is-mobile .bp-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: auto;
+  gap: 0;
+}
+
+html.is-mobile .bp-time {
+  display: none;
+}
+
+html.is-mobile .bp-track {
+  height: 3px;
+  border-radius: 0;
+}
+
+html.is-mobile .bp-guild-tag,
+html.is-mobile .bp-vol,
+html.is-mobile #bp-loop,
+html.is-mobile #bp-shuffle {
+  display: none;
+}
+
+html.is-mobile .app {
+  padding-bottom: 64px;
+}
+
+/* ══════════════════════════════════════════════════════
    QUEUE / HISTORY VIEWS
 ════════════════════════════════════════════════════════ */
 

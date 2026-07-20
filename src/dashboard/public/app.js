@@ -3,6 +3,33 @@
 const $ = sel => document.querySelector(sel);
 const $$ = sel => document.querySelectorAll(sel);
 
+// ── Device detection ────────────────────────────────
+// Tags <html> with data-device="mobile|desktop" and a matching class so CSS
+// (and any JS that wants it) can branch on device type. Combines UA sniffing
+// with a viewport check so tablets/small windows still get the mobile layout.
+function isMobileDevice() {
+  const uaMobile = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini|Mobile|webOS/i.test(navigator.userAgent);
+  const narrowViewport = window.matchMedia("(max-width: 768px)").matches;
+  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  return uaMobile || (narrowViewport && coarsePointer);
+}
+
+function applyDeviceClass() {
+  const mobile = isMobileDevice();
+  document.documentElement.classList.toggle("is-mobile", mobile);
+  document.documentElement.classList.toggle("is-desktop", !mobile);
+  document.documentElement.setAttribute("data-device", mobile ? "mobile" : "desktop");
+}
+
+applyDeviceClass();
+
+let deviceCheckTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(deviceCheckTimer);
+  deviceCheckTimer = setTimeout(applyDeviceClass, 200);
+});
+window.addEventListener("orientationchange", applyDeviceClass);
+
 // ── Elements ─────────────────────────────────────────
 const loginScreen   = $("#login-screen");
 const loginForm     = $("#login-form");
