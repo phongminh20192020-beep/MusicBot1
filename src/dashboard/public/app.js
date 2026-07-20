@@ -37,6 +37,8 @@ const viewQueue     = $("#view-queue");
 const viewHistory   = $("#view-history");
 const genresScroll  = $("#genres-scroll");
 const featuredGrid  = $("#featured-grid");
+const featuredLoading = $("#featured-loading");
+const discoverLoading = $("#discover-loading");
 const discoverList       = $("#discover-list");
 const discoverPagination = $("#discover-pagination");
 const dpPrev             = $("#dp-prev");
@@ -279,17 +281,22 @@ function shadeColor(hex, percent) {
 }
 
 // ── Discovery ────────────────────────────────────────
+const discoverTitleText = $("#discover-title-text");
+
 function showSkeletons() {
   if (featuredGrid) featuredGrid.innerHTML = Array(3).fill(0).map(() => '<div class="skeleton featured-card"></div>').join('');
   if (discoverList) discoverList.innerHTML = Array(10).fill(0).map(() => '<div class="skeleton discover-row" style="aspect-ratio:1/1.35;"></div>').join('');
 }
 
+function setLoadingState(isLoading) {
+  if (featuredLoading) featuredLoading.classList.toggle('hidden', !isLoading);
+  if (discoverLoading) discoverLoading.classList.toggle('hidden', !isLoading);
+}
+
 async function loadDiscovery() {
-  const discoverTitle = discoverList?.previousElementSibling;
-  if (discoverTitle && discoverTitle.classList.contains('discover-title')) {
-    discoverTitle.textContent = "Discover new music";
-  }
+  if (discoverTitleText) discoverTitleText.textContent = "Discover new music";
   showSkeletons();
+  setLoadingState(true);
   try {
     const res = await apiFetch("/api/lastfm/trending");
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -302,15 +309,15 @@ async function loadDiscovery() {
     featuredGrid.innerHTML = '<div class="discover-empty">Error loading trending tracks</div>';
     discoverList.innerHTML = '';
     if (discoverPagination) discoverPagination.classList.add('hidden');
+  } finally {
+    setLoadingState(false);
   }
 }
 
 async function loadByTag(tag) {
-  const discoverTitle = discoverList?.previousElementSibling;
-  if (discoverTitle && discoverTitle.classList.contains('discover-title')) {
-    discoverTitle.textContent = "Discover new music";
-  }
+  if (discoverTitleText) discoverTitleText.textContent = "Discover new music";
   showSkeletons();
+  setLoadingState(true);
   try {
     const res = await apiFetch("/api/lastfm/tag?tag=" + encodeURIComponent(tag));
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -323,6 +330,8 @@ async function loadByTag(tag) {
     featuredGrid.innerHTML = '<div class="discover-empty">Error loading genre tracks</div>';
     discoverList.innerHTML = '';
     if (discoverPagination) discoverPagination.classList.add('hidden');
+  } finally {
+    setLoadingState(false);
   }
 }
 

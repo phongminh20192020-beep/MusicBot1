@@ -1801,6 +1801,28 @@ input {
   color: var(--text);
   margin-bottom: 4px;
   letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--surface-3);
+  border-top-color: var(--primary, #6c5ce7);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+
+.spinner.hidden {
+  display: none;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .discover-sub {
