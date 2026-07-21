@@ -649,7 +649,7 @@ function renderDiscover(tracks) {
         '<div class="dr-meta-row">' +
           '<span class="dr-dur">' + escapeHtml(t.durationFmt || "3:45") + '</span>' +
           '<span style="display:flex;gap:2px;">' +
-            '<button class="dr-btn dr-like" title="Like">♡</button>' +
+            '<button class="dr-btn dr-like" title="Like"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg></button>' +
             '<button class="dr-btn dr-more" title="Add to queue">+</button>' +
           '</span>' +
         '</div>' +
@@ -840,7 +840,9 @@ function updateBottomPlayer(player) {
   const pct = track.duration ? Math.min(100, (player.position / track.duration) * 100) : 0;
   bpFill.style.width = pct + "%";
 
-  bpPlaypause.textContent = player.paused ? "▶" : "⏸";
+  const PLAY_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
+  const PAUSE_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="none"><rect x="5" y="3" width="5" height="18" rx="1"></rect><rect x="14" y="3" width="5" height="18" rx="1"></rect></svg>';
+  bpPlaypause.innerHTML = player.paused ? PLAY_ICON : PAUSE_ICON;
   bpPlaypause.title = player.paused ? "Resume" : "Pause";
   bpVol.value = player.volume || 100;
 }
