@@ -66,6 +66,7 @@ const genresScroll  = $("#genres-scroll");
 const featuredGrid  = $("#featured-grid");
 const featuredLoading = $("#featured-loading");
 const discoverLoading = $("#discover-loading");
+const discoverBack       = $("#discover-back");
 const discoverList       = $("#discover-list");
 const discoverPagination = $("#discover-pagination");
 const dpPrev             = $("#dp-prev");
@@ -330,9 +331,15 @@ function setLoadingState(isLoading) {
   if (discoverLoading) discoverLoading.classList.toggle('hidden', !isLoading);
 }
 
+function updateBackButton() {
+  if (!discoverBack) return;
+  discoverBack.classList.toggle('hidden', discoverMode === 'trending');
+}
+
 async function loadDiscovery(page = 1) {
   discoverMode = 'trending';
   discoverTag = '';
+  updateBackButton();
   if (discoverTitleText) discoverTitleText.textContent = "Discover new music";
   showSkeletons();
   setLoadingState(true);
@@ -357,6 +364,7 @@ async function loadDiscovery(page = 1) {
 async function loadByTag(tag, page = 1) {
   discoverMode = 'tag';
   discoverTag = tag;
+  updateBackButton();
   if (discoverTitleText) discoverTitleText.textContent = "Discover new music";
   showSkeletons();
   setLoadingState(true);
@@ -700,6 +708,7 @@ async function searchLastFm(query) {
       toast("No results found", {type:"error"});
       renderFeatured([]);
       discoverMode = 'search';
+      updateBackButton();
       discoverAllTracks = [];
       discoverPage = 0;
       renderDiscover([]);
@@ -717,6 +726,7 @@ async function searchLastFm(query) {
 
     // Show top 3 as featured cards; paginate the rest locally
     discoverMode = 'search';
+    updateBackButton();
     discoverAllTracks = tracks;
     discoverPage = 0;
     renderFeatured(tracks.slice(0, 3));
@@ -739,6 +749,15 @@ globalSearchInput.addEventListener("input", () => {
 globalSearchInput.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); clearTimeout(globalDebounce); doGlobalSearch(); }
 });
+
+// ── Discover back button ──────────────────────────────
+if (discoverBack) {
+  discoverBack.addEventListener('click', () => {
+    if (globalSearchInput) globalSearchInput.value = '';
+    genresScroll?.querySelectorAll('.genre-card').forEach(c => c.classList.remove('active'));
+    loadDiscovery(1);
+  });
+}
 
 // ── Discover pagination controls ─────────────────────
 if (dpPrev) {
