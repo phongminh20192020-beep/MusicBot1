@@ -10,7 +10,7 @@ const { exec } = require("child_process");
 const { promisify } = require("util");
 const { COOKIE_NAME, createSession, destroySession, requireAuth, isValidFromHeader, parseCookies, isValid } = require("./auth");
 const { statsToJSON, playerToJSON } = require("./state");
-const { formatDuration, resolveSpotify, getSpotifyRecommendations, extractSpotifyId, getSpotifyToken } = require("../utils/helpers");
+const { formatDuration, resolveSpotify, getSpotifyRecommendations, extractSpotifyId } = require("../utils/helpers");
 const { PENALTY_WORDS, TIER1_BONUS, TIER2_BONUS, TIER3_BONUS } = require("./public/keywords");
 
 const VALID_LOOP_MODES = new Set(["off", "track", "queue"]);
@@ -660,14 +660,26 @@ function startDashboard(client) {
   });
 
   // ─── Artist "Songs" (full discography, sorted by official release date) ──
-  // Last.fm's artist.getTopTracks has no release-date data, so this uses the
-  // Spotify Web API (client-credentials, same creds as /play's Spotify support)
-  // to pull the artist's albums+singles, flatten their tracks, sort newest-first,
-  // and cache the result in-memory per artist for a few minutes.
+  // Last.fm's artist.getTopTracks has no release-date data, so dates come from
+  // MusicBrainz (free, no API key — release-groups carry a first-release-date).
+  // Tracklists + artwork still come from Last.fm's album.getInfo, keeping this
+  // endpoint fully off Spotify. Result is cached in-memory per artist for a
+  // few minutes since MusicBrainz asks clients to keep request volume low.
   const artistSongsCache = new Map(); // key: lowercased artist name -> { songs, fetchedAt }
   const ARTIST_SONGS_CACHE_TTL_MS = 10 * 60 * 1000;
   const ARTIST_SONGS_PAGE_SIZE = 10;
-  const ARTIST_SONGS_MAX_ALBUMS = 25; // bound how many albums we fetch full tracklists for
+  const ARTIST_SONGS_MAX_ALBUMS = 25; // bound how many release-groups we fetch full tracklists for
+
+  const MUSICBRAINZ_UA = "MusicBot1-Dashboard/1.0 (+https://github.com/phongminh20192020-beep/MusicBot1)";
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  async function musicbrainzFetch(pathAndQuery) {
+    const res = await fetch(`https://musicbrainz.org/ws/2/${pathAndQuery}`, {
+      headers: { "User-Agent": MUSICBRAINZ_UA, "Accept": "application/json" },
+    });
+    if (!res.ok) throw new Error(`MusicBrainz request failed (${res.status})`);
+    return res.json();
+  }
 
   async function fetchArtistSongsByDate(artistName) {
     const cacheKey = artistName.toLowerCase();
@@ -676,60 +688,70 @@ function startDashboard(client) {
       return cached.songs;
     }
 
-    const token = await getSpotifyToken();
-    const headers = { Authorization: `Bearer ${token}` };
-
-    // 1. Find the artist on Spotify
-    const searchRes = await fetch(
-      "https://api.spotify.com/v1/search?type=artist&limit=1&q=" + encodeURIComponent(artistName),
-      { headers }
+    // 1. Find the artist on MusicBrainz
+    const searchData = await musicbrainzFetch(
+      `artist/?query=${encodeURIComponent(`artist:"${artistName}"`)}&limit=1&fmt=json`
     );
-    if (!searchRes.ok) throw new Error(`Spotify artist search failed (${searchRes.status})`);
-    const searchData = await searchRes.json();
-    const spotifyArtist = searchData.artists?.items?.[0];
-    if (!spotifyArtist) return [];
+    const mbArtist = searchData.artists?.[0];
+    if (!mbArtist) return [];
 
-    // 2. Get their albums + singles (up to 50, Spotify's per-request max)
-    const albumsRes = await fetch(
-      `https://api.spotify.com/v1/artists/${spotifyArtist.id}/albums?include_groups=album,single&limit=50&market=US`,
-      { headers }
-    );
-    if (!albumsRes.ok) throw new Error(`Spotify albums fetch failed (${albumsRes.status})`);
-    const albumsData = await albumsRes.json();
-    let albums = albumsData.items || [];
+    // MusicBrainz asks unauthenticated clients to stay around 1 req/sec
+    await sleep(1000);
 
-    // Newest release first
-    albums.sort((a, b) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime());
-    albums = albums.slice(0, ARTIST_SONGS_MAX_ALBUMS);
+    // 2. Get their release-groups (albums + singles + EPs), paginated up to
+    // Spotify-parity volume, then sort newest-release-first.
+    let releaseGroups = [];
+    let offset = 0;
+    const RG_PAGE = 100;
+    while (offset < 300) {
+      const rgData = await musicbrainzFetch(
+        `release-group?artist=${mbArtist.id}&type=album|single|ep&limit=${RG_PAGE}&offset=${offset}&fmt=json`
+      );
+      const batch = rgData["release-groups"] || [];
+      releaseGroups.push(...batch);
+      if (batch.length < RG_PAGE) break;
+      offset += RG_PAGE;
+      await sleep(1000);
+    }
 
-    // 3. Pull full tracklists for each album (has release date attached)
+    releaseGroups = releaseGroups.filter(rg => rg["first-release-date"]);
+    releaseGroups.sort((a, b) => new Date(b["first-release-date"]) - new Date(a["first-release-date"]));
+    releaseGroups = releaseGroups.slice(0, ARTIST_SONGS_MAX_ALBUMS);
+
+    // 3. Pull full tracklists + artwork for each release from Last.fm
     const seenTitles = new Set();
     const songs = [];
-    for (const album of albums) {
+    for (const rg of releaseGroups) {
       try {
-        const albumRes = await fetch(`https://api.spotify.com/v1/albums/${album.id}?market=US`, { headers });
-        if (!albumRes.ok) continue;
-        const albumData = await albumRes.json();
-        const artwork = albumData.images?.[0]?.url || album.images?.[0]?.url || null;
-        for (const t of albumData.tracks?.items || []) {
+        const data = await lastfmFetch("album.getInfo", { artist: artistName, album: rg.title });
+        const albumInfo = data.album;
+        if (!albumInfo) continue;
+        const artwork = albumInfo.image?.slice().reverse().find(img => img["#text"])?.["#text"] || null;
+        const rawTracks = albumInfo.tracks?.track;
+        const trackList = Array.isArray(rawTracks) ? rawTracks : (rawTracks ? [rawTracks] : []);
+        const precision = rg["first-release-date"].length === 4 ? "year"
+          : rg["first-release-date"].length === 7 ? "month" : "day";
+
+        for (const t of trackList) {
+          if (!t.name) continue;
           const dedupeKey = t.name.toLowerCase().replace(/\s*\(.*?\)\s*/g, "").trim();
           if (seenTitles.has(dedupeKey)) continue; // skip deluxe/remaster dupes, keep newest version
           seenTitles.add(dedupeKey);
-          const artistNames = (t.artists || []).map(a => a.name).join(", ") || artistName;
-          const cleanQuery = sanitizeSearchQuery(`${artistNames} ${t.name}`.trim());
+          const trackArtist = t.artist?.name || artistName;
+          const cleanQuery = sanitizeSearchQuery(`${trackArtist} ${t.name}`.trim());
           songs.push({
             title: t.name,
-            artist: artistNames,
+            artist: trackArtist,
             artwork,
             uri: "ytmsearch:" + cleanQuery,
-            durationFmt: formatDuration(t.duration_ms || 0),
-            releaseDate: album.release_date,
-            releaseDatePrecision: album.release_date_precision,
-            albumName: album.name,
+            durationFmt: t.duration && Number(t.duration) > 0 ? formatDuration(Number(t.duration) * 1000) : "3:45",
+            releaseDate: rg["first-release-date"],
+            releaseDatePrecision: precision,
+            albumName: rg.title,
           });
         }
       } catch (e) {
-        console.error("[Dashboard] Failed to fetch album tracks for", album.name, ":", e.message);
+        console.error("[Dashboard] Failed to fetch Last.fm album info for", rg.title, ":", e.message);
       }
     }
 
