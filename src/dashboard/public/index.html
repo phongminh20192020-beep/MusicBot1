@@ -108,10 +108,17 @@
         </div>
         <div class="discover-section">
           <h2 class="discover-title">
+            <span>Popular Artists</span>
+            <span class="spinner hidden" id="artists-loading"></span>
+          </h2>
+          <div class="artists-grid" id="artists-grid"></div>
+        </div>
+        <div class="discover-section">
+          <h2 class="discover-title">
             <button class="discover-back hidden" id="discover-back" title="Back to trending">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
             </button>
-            <span>Featured for you</span>
+            <span id="featured-title-text">Featured for you</span>
             <span class="spinner hidden" id="featured-loading"></span>
           </h2>
           <div class="featured-grid" id="featured-grid"></div>

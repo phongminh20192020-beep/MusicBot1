@@ -302,6 +302,47 @@ function isValidHttpUrl(url) {
   return typeof url === "string" && /^https?:\/\//.test(url) && url.length > 10;
 }
 
+// ── Artist artwork enrichment ─────────────────────────
+// Uses the artist's name alone as the search query to grab a representative
+// thumbnail (Lavalink first, yt-dlp as fallback), same pattern as track artwork.
+async function enrichArtistsWithArtwork(client, artists) {
+  const node = client.lavalink.nodeManager.nodes.get("main");
+  const enriched = [];
+  for (const artist of artists) {
+    let found = false;
+
+    if (node && node.connected) {
+      try {
+        const result = await node.search({ query: artist.name, source: "ytmsearch" }, { username: "Dashboard", tag: "Dashboard" });
+        if (result?.tracks?.[0]?.info?.artworkUrl) {
+          artist.artwork = result.tracks[0].info.artworkUrl;
+          found = true;
+        } else if (result?.tracks?.[0]?.info?.identifier) {
+          artist.artwork = `https://img.youtube.com/vi/${result.tracks[0].info.identifier}/hqdefault.jpg`;
+          found = true;
+        }
+      } catch (e) {
+        console.error("[Dashboard] Lavalink artwork search failed for artist", artist.name, ":", e.message);
+      }
+    }
+
+    if (!found) {
+      try {
+        const ytDlpUrl = await getYtDlpThumbnail(artist.name);
+        if (ytDlpUrl) {
+          artist.artwork = ytDlpUrl;
+          found = true;
+        }
+      } catch (e) {
+        console.error("[Dashboard] yt-dlp artwork fetch failed for artist", artist.name, ":", e.message);
+      }
+    }
+
+    enriched.push(artist);
+  }
+  return enriched;
+}
+
 // ── Search cache ───────────────────────────────────
 function cacheSearchResult(guildId, track) {
   const token = crypto.randomUUID();
@@ -567,6 +608,53 @@ function startDashboard(client) {
       res.json({ tracks, page, totalPages });
     } catch (err) {
       console.error("[Dashboard] Last.fm tag error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  const ARTIST_PAGE_SIZE = 8;
+
+  app.get("/api/lastfm/top-artists", requireAuth, async (req, res) => {
+    try {
+      const tag = (req.query.tag || "").toString().trim();
+      const method = tag ? "tag.gettopartists" : "chart.gettopartists";
+      const params = tag ? { tag, limit: String(ARTIST_PAGE_SIZE) } : { limit: String(ARTIST_PAGE_SIZE) };
+      console.log("[Dashboard] Fetching Last.fm top artists" + (tag ? " for tag: " + tag : " (global)"));
+      const data = await lastfmFetch(method, params);
+      const root = data.artists || data.topartists || {};
+      const raw = root.artist || [];
+      let artists = raw.slice(0, ARTIST_PAGE_SIZE).map(a => ({
+        name: (typeof a === "string" ? a : a.name) || "Unknown",
+        listeners: Number(a.listeners || 0),
+        artwork: null,
+      })).filter(a => a.name && a.name !== "Unknown");
+      artists = await enrichArtistsWithArtwork(client, artists);
+      console.log("[Dashboard] Returning", artists.length, "top artists");
+      res.json({ artists });
+    } catch (err) {
+      console.error("[Dashboard] Last.fm top artists error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/lastfm/artist-tracks", requireAuth, async (req, res) => {
+    try {
+      const artist = (req.query.artist || "").toString().trim();
+      if (!artist) return res.status(400).json({ error: "artist is required" });
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      console.log("[Dashboard] Fetching top tracks for artist:", artist, "page", page);
+      const data = await lastfmFetch("artist.gettoptracks", { artist, limit: String(DISCOVER_PAGE_SIZE), page: String(page) });
+      const root = data.toptracks || data.tracks || {};
+      const raw = root.track || [];
+      const attr = root["@attr"] || {};
+      console.log("[Dashboard] Last.fm returned", raw.length, "tracks for artist");
+      let tracks = raw.map(lastfmTrackToJSON).filter(Boolean);
+      tracks = await enrichTracksWithArtwork(client, tracks, DISCOVER_PAGE_SIZE);
+      console.log("[Dashboard] Enriched", tracks.length, "artist tracks for page", page);
+      const totalPages = Math.min(MAX_DISCOVER_PAGES, Math.max(1, parseInt(attr.totalPages, 10) || 1));
+      res.json({ tracks, page, totalPages, artist });
+    } catch (err) {
+      console.error("[Dashboard] Last.fm artist tracks error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });
