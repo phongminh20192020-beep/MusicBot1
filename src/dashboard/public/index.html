@@ -108,6 +108,9 @@
         </div>
         <div class="discover-section">
           <h2 class="discover-title">
+            <button class="discover-back hidden" id="discover-back" title="Back to trending">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
             <span>Popular Artists</span>
             <span class="spinner hidden" id="artists-loading"></span>
           </h2>
@@ -115,9 +118,6 @@
         </div>
         <div class="discover-section">
           <h2 class="discover-title">
-            <button class="discover-back hidden" id="discover-back" title="Back to trending">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-            </button>
             <span id="featured-title-text">Featured for you</span>
             <span class="spinner hidden" id="featured-loading"></span>
           </h2>
@@ -142,6 +142,31 @@
 
       <!-- HISTORY VIEW -->
       <section id="view-history" class="view-section hidden"></section>
+
+      <!-- ARTIST PROFILE VIEW -->
+      <section id="view-artist" class="view-section hidden">
+        <button class="artist-page-back" id="artist-page-back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          <span>Back</span>
+        </button>
+        <div class="artist-hero">
+          <div class="artist-hero-avatar-wrap">
+            <img class="artist-hero-avatar" id="artist-hero-avatar" src="" alt="">
+          </div>
+          <div class="artist-hero-info">
+            <div class="artist-hero-label">Artist</div>
+            <h1 class="artist-hero-name" id="artist-hero-name"></h1>
+            <div class="artist-hero-sub" id="artist-hero-sub"></div>
+          </div>
+        </div>
+        <h2 class="discover-title">Popular <span class="spinner hidden" id="artist-page-loading"></span></h2>
+        <div class="artist-track-list" id="artist-track-list"></div>
+        <div class="discover-pagination hidden" id="artist-pagination">
+          <button class="dp-btn" id="artist-dp-prev" title="Previous page">&#8249;</button>
+          <span class="dp-label" id="artist-dp-label">1 / 2</span>
+          <button class="dp-btn" id="artist-dp-next" title="Next page">&#8250;</button>
+        </div>
+      </section>
 
     </main>
   </div>

@@ -316,13 +316,12 @@ function shadeColor(hex, percent) {
 // ── Discovery ────────────────────────────────────────
 const discoverTitleText = $("#discover-title-text");
 
-// discoverMode: 'trending' | 'tag' | 'search' | 'artist'
-// For 'trending'/'tag'/'artist', each page is fetched fresh from the server (10 tracks + artwork),
+// discoverMode: 'trending' | 'tag' | 'search'
+// For 'trending'/'tag', each page is fetched fresh from the server (10 tracks + artwork),
 // and the previous page's DOM (and its images) is discarded when we render the new page.
 // For 'search', results come back as one batch and are paginated locally.
 let discoverMode = 'trending';
 let discoverTag = '';
-let discoverArtist = '';
 let discoverTotalPages = 1;
 
 function showSkeletons() {
@@ -368,7 +367,7 @@ function renderArtists(artists) {
   }
   artistsGrid.innerHTML = artists.map((a) => {
     const src = isValidImageUrl(a.artwork) ? escapeHtml(a.artwork) : FALLBACK_ARTWORK;
-    return '<div class="artist-card" data-artist="' + escapeHtml(a.name) + '">' +
+    return '<div class="artist-card" data-artist="' + escapeHtml(a.name) + '" data-artwork="' + src + '">' +
       '<div class="artist-avatar-wrap">' +
         '<img class="artist-avatar" src="' + src + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_ARTWORK;">' +
         '<div class="artist-play">' +
@@ -381,39 +380,136 @@ function renderArtists(artists) {
 
   artistsGrid.querySelectorAll('.artist-card').forEach(card => {
     card.addEventListener('click', () => {
-      artistsGrid.querySelectorAll('.artist-card').forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
-      loadByArtist(card.dataset.artist);
+      openArtistPage(card.dataset.artist, card.dataset.artwork);
     });
   });
 }
 
-async function loadByArtist(artistName, page = 1) {
-  discoverMode = 'artist';
-  discoverArtist = artistName;
-  updateBackButton();
-  if (featuredTitleText) featuredTitleText.textContent = "Top tracks by " + artistName;
-  if (discoverTitleText) discoverTitleText.textContent = "More from " + artistName;
-  showSkeletons();
-  setLoadingState(true);
+// ── Artist Profile Page ────────────────────────────────
+const viewArtist          = $("#view-artist");
+const artistPageBack      = $("#artist-page-back");
+const artistHeroAvatar    = $("#artist-hero-avatar");
+const artistHeroName      = $("#artist-hero-name");
+const artistHeroSub       = $("#artist-hero-sub");
+const artistPageLoading   = $("#artist-page-loading");
+const artistTrackList     = $("#artist-track-list");
+const artistPagination    = $("#artist-pagination");
+const artistDpPrev        = $("#artist-dp-prev");
+const artistDpNext        = $("#artist-dp-next");
+const artistDpLabel       = $("#artist-dp-label");
+
+let currentArtistName = '';
+let artistPage = 1;
+let artistTotalPages = 1;
+let previousView = 'home';
+
+function openArtistPage(artistName, artworkUrl) {
+  previousView = currentView || 'home';
+  currentArtistName = artistName;
+  $$('.view-section').forEach(el => el.classList.add('hidden'));
+  viewArtist.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+
+  if (artistHeroName) artistHeroName.textContent = artistName;
+  if (artistHeroSub) artistHeroSub.textContent = '';
+  if (artistHeroAvatar) artistHeroAvatar.src = isValidImageUrl(artworkUrl) ? artworkUrl : FALLBACK_ARTWORK;
+
+  loadArtistTracks(artistName, 1);
+}
+
+function closeArtistPage() {
+  $$('.view-section').forEach(el => el.classList.add('hidden'));
+  if (previousView === 'queue') { viewQueue.classList.remove('hidden'); renderQueueView(); }
+  else if (previousView === 'history') { viewHistory.classList.remove('hidden'); renderHistoryView(); }
+  else { viewHome.classList.remove('hidden'); }
+  currentView = previousView;
+}
+
+if (artistPageBack) artistPageBack.addEventListener('click', closeArtistPage);
+
+async function loadArtistTracks(artistName, page = 1) {
+  if (artistPageLoading) artistPageLoading.classList.remove('hidden');
+  if (artistTrackList) {
+    artistTrackList.innerHTML = Array(10).fill(0).map(() =>
+      '<div class="skeleton at-row" style="height:60px;"></div>'
+    ).join('');
+  }
   try {
     const res = await apiFetch("/api/lastfm/artist-tracks?artist=" + encodeURIComponent(artistName) + "&page=" + page);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     const tracks = data.tracks || [];
-    discoverPage = data.page || page;
-    discoverTotalPages = data.totalPages || 1;
-    if (page === 1) renderFeatured(tracks.slice(0, 3));
-    renderDiscover(tracks);
-    if (discoverList) discoverList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    artistPage = data.page || page;
+    artistTotalPages = data.totalPages || 1;
+    renderArtistTracks(tracks, page);
+    updateArtistPagination();
   } catch (e) {
-    featuredGrid.innerHTML = '<div class="discover-empty">Error loading tracks for this artist</div>';
-    discoverList.innerHTML = '';
-    if (discoverPagination) discoverPagination.classList.add('hidden');
+    if (artistTrackList) artistTrackList.innerHTML = '<div class="discover-empty">Error loading tracks for this artist</div>';
+    if (artistPagination) artistPagination.classList.add('hidden');
   } finally {
-    setLoadingState(false);
+    if (artistPageLoading) artistPageLoading.classList.add('hidden');
   }
 }
+
+function renderArtistTracks(tracks, page) {
+  if (!artistTrackList) return;
+  if (!tracks.length) {
+    artistTrackList.innerHTML = '<div class="discover-empty">No tracks found for this artist</div>';
+    return;
+  }
+  const startRank = (page - 1) * 10 + 1;
+  artistTrackList.innerHTML = tracks.map((t, i) => {
+    const src = isValidImageUrl(t.artwork) ? escapeHtml(t.artwork) : FALLBACK_ARTWORK;
+    return '<div class="at-row" data-uri="' + escapeHtml(t.uri || '') + '">' +
+      '<div class="at-rank">' +
+        '<span class="at-rank-num">' + (startRank + i) + '</span>' +
+        '<span class="at-rank-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>' +
+      '</div>' +
+      '<img class="at-art" src="' + src + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_ARTWORK;">' +
+      '<div class="at-info">' +
+        '<div class="at-title">' + escapeHtml(t.title) + '</div>' +
+        '<div class="at-artist">' + escapeHtml(t.artist) + '</div>' +
+      '</div>' +
+      '<span class="at-dur">' + escapeHtml(t.durationFmt || "3:45") + '</span>' +
+    '</div>';
+  }).join('');
+
+  artistTrackList.querySelectorAll('.at-row').forEach(row => {
+    row.addEventListener('click', () => {
+      playUri(row.dataset.uri, row.querySelector('.at-title').textContent);
+    });
+  });
+}
+
+function updateArtistPagination() {
+  if (!artistPagination) return;
+  if (artistTotalPages > 1) {
+    artistPagination.classList.remove('hidden');
+    if (artistDpLabel) artistDpLabel.textContent = artistPage + ' / ' + artistTotalPages;
+    if (artistDpPrev) artistDpPrev.disabled = artistPage <= 1;
+    if (artistDpNext) artistDpNext.disabled = artistPage >= artistTotalPages;
+  } else {
+    artistPagination.classList.add('hidden');
+  }
+}
+
+if (artistDpPrev) {
+  artistDpPrev.addEventListener('click', () => {
+    if (artistPage > 1) {
+      loadArtistTracks(currentArtistName, artistPage - 1).then(() =>
+        artistTrackList.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  });
+}
+if (artistDpNext) {
+  artistDpNext.addEventListener('click', () => {
+    if (artistPage < artistTotalPages) {
+      loadArtistTracks(currentArtistName, artistPage + 1).then(() =>
+        artistTrackList.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  });
+}
+
 
 async function loadDiscovery(page = 1) {
   discoverMode = 'trending';
@@ -847,7 +943,6 @@ if (discoverBack) {
 // ── Discover pagination controls ─────────────────────
 function pagedLoader(page) {
   if (discoverMode === 'tag') return loadByTag(discoverTag, page);
-  if (discoverMode === 'artist') return loadByArtist(discoverArtist, page);
   return loadDiscovery(page);
 }
 
