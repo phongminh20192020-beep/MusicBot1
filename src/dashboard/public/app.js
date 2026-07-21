@@ -934,8 +934,6 @@ if (discoverBack) {
   discoverBack.addEventListener('click', () => {
     if (globalSearchInput) globalSearchInput.value = '';
     genresScroll?.querySelectorAll('.genre-card').forEach(c => c.classList.remove('active'));
-    artistsGrid?.querySelectorAll('.artist-card').forEach(c => c.classList.remove('active'));
-    discoverArtist = '';
     loadDiscovery(1);
   });
 }
