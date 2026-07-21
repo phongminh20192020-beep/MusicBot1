@@ -393,14 +393,17 @@ const artistHeroName      = $("#artist-hero-name");
 const artistHeroSub       = $("#artist-hero-sub");
 const artistPageLoading   = $("#artist-page-loading");
 const artistTrackList     = $("#artist-track-list");
-const artistPagination    = $("#artist-pagination");
-const artistDpPrev        = $("#artist-dp-prev");
-const artistDpNext        = $("#artist-dp-next");
-const artistDpLabel       = $("#artist-dp-label");
+
+const artistSongsLoading    = $("#artist-songs-loading");
+const artistSongsList       = $("#artist-songs-list");
+const artistSongsPagination = $("#artist-songs-pagination");
+const artistSongsDpPrev     = $("#artist-songs-dp-prev");
+const artistSongsDpNext     = $("#artist-songs-dp-next");
+const artistSongsDpLabel    = $("#artist-songs-dp-label");
 
 let currentArtistName = '';
-let artistPage = 1;
-let artistTotalPages = 1;
+let artistSongsPage = 1;
+let artistSongsTotalPages = 1;
 let previousView = 'home';
 
 function openArtistPage(artistName, artworkUrl) {
@@ -414,7 +417,8 @@ function openArtistPage(artistName, artworkUrl) {
   if (artistHeroSub) artistHeroSub.textContent = '';
   if (artistHeroAvatar) artistHeroAvatar.src = isValidImageUrl(artworkUrl) ? artworkUrl : FALLBACK_ARTWORK;
 
-  loadArtistTracks(artistName, 1);
+  loadArtistPopular(artistName);
+  loadArtistSongs(artistName, 1);
 }
 
 function closeArtistPage() {
@@ -427,39 +431,71 @@ function closeArtistPage() {
 
 if (artistPageBack) artistPageBack.addEventListener('click', closeArtistPage);
 
-async function loadArtistTracks(artistName, page = 1) {
+// ── Popular: top 5 tracks by popularity, no pagination ──
+async function loadArtistPopular(artistName) {
   if (artistPageLoading) artistPageLoading.classList.remove('hidden');
   if (artistTrackList) {
-    artistTrackList.innerHTML = Array(10).fill(0).map(() =>
+    artistTrackList.innerHTML = Array(5).fill(0).map(() =>
       '<div class="skeleton at-row" style="height:60px;"></div>'
     ).join('');
   }
   try {
-    const res = await apiFetch("/api/lastfm/artist-tracks?artist=" + encodeURIComponent(artistName) + "&page=" + page);
+    const res = await apiFetch("/api/lastfm/artist-tracks?artist=" + encodeURIComponent(artistName) + "&page=1");
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    const tracks = data.tracks || [];
-    artistPage = data.page || page;
-    artistTotalPages = data.totalPages || 1;
-    renderArtistTracks(tracks, page);
-    updateArtistPagination();
+    const tracks = (data.tracks || []).slice(0, 5);
+    renderArtistRowList(artistTrackList, tracks, 1);
   } catch (e) {
-    if (artistTrackList) artistTrackList.innerHTML = '<div class="discover-empty">Error loading tracks for this artist</div>';
-    if (artistPagination) artistPagination.classList.add('hidden');
+    if (artistTrackList) artistTrackList.innerHTML = '<div class="discover-empty">Error loading popular tracks</div>';
   } finally {
     if (artistPageLoading) artistPageLoading.classList.add('hidden');
   }
 }
 
-function renderArtistTracks(tracks, page) {
-  if (!artistTrackList) return;
-  if (!tracks.length) {
-    artistTrackList.innerHTML = '<div class="discover-empty">No tracks found for this artist</div>';
+// ── Songs: full discography, sorted by official release date, paginated ──
+async function loadArtistSongs(artistName, page = 1) {
+  if (artistSongsLoading) artistSongsLoading.classList.remove('hidden');
+  if (artistSongsList) {
+    artistSongsList.innerHTML = Array(10).fill(0).map(() =>
+      '<div class="skeleton at-row" style="height:60px;"></div>'
+    ).join('');
+  }
+  try {
+    const res = await apiFetch("/api/lastfm/artist-songs?artist=" + encodeURIComponent(artistName) + "&page=" + page);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const songs = data.songs || [];
+    artistSongsPage = data.page || page;
+    artistSongsTotalPages = data.totalPages || 1;
+    const startRank = (artistSongsPage - 1) * 10 + 1;
+    renderArtistRowList(artistSongsList, songs, startRank, { showReleaseDate: true });
+    updateArtistSongsPagination();
+  } catch (e) {
+    if (artistSongsList) artistSongsList.innerHTML = '<div class="discover-empty">Error loading songs for this artist</div>';
+    if (artistSongsPagination) artistSongsPagination.classList.add('hidden');
+  } finally {
+    if (artistSongsLoading) artistSongsLoading.classList.add('hidden');
+  }
+}
+
+function formatReleaseDate(dateStr, precision) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  if (precision === 'year') return String(d.getUTCFullYear());
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: precision === 'month' ? undefined : 'numeric' });
+}
+
+function renderArtistRowList(container, items, startRank, opts) {
+  if (!container) return;
+  opts = opts || {};
+  if (!items.length) {
+    container.innerHTML = '<div class="discover-empty">No tracks found</div>';
     return;
   }
-  const startRank = (page - 1) * 10 + 1;
-  artistTrackList.innerHTML = tracks.map((t, i) => {
+  container.innerHTML = items.map((t, i) => {
     const src = isValidImageUrl(t.artwork) ? escapeHtml(t.artwork) : FALLBACK_ARTWORK;
+    const dateLabel = opts.showReleaseDate ? formatReleaseDate(t.releaseDate, t.releaseDatePrecision) : '';
     return '<div class="at-row" data-uri="' + escapeHtml(t.uri || '') + '">' +
       '<div class="at-rank">' +
         '<span class="at-rank-num">' + (startRank + i) + '</span>' +
@@ -468,44 +504,44 @@ function renderArtistTracks(tracks, page) {
       '<img class="at-art" src="' + src + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_ARTWORK;">' +
       '<div class="at-info">' +
         '<div class="at-title">' + escapeHtml(t.title) + '</div>' +
-        '<div class="at-artist">' + escapeHtml(t.artist) + '</div>' +
+        '<div class="at-artist">' + escapeHtml(t.artist) + (dateLabel ? ' · ' + escapeHtml(dateLabel) : '') + '</div>' +
       '</div>' +
       '<span class="at-dur">' + escapeHtml(t.durationFmt || "3:45") + '</span>' +
     '</div>';
   }).join('');
 
-  artistTrackList.querySelectorAll('.at-row').forEach(row => {
+  container.querySelectorAll('.at-row').forEach(row => {
     row.addEventListener('click', () => {
       playUri(row.dataset.uri, row.querySelector('.at-title').textContent);
     });
   });
 }
 
-function updateArtistPagination() {
-  if (!artistPagination) return;
-  if (artistTotalPages > 1) {
-    artistPagination.classList.remove('hidden');
-    if (artistDpLabel) artistDpLabel.textContent = artistPage + ' / ' + artistTotalPages;
-    if (artistDpPrev) artistDpPrev.disabled = artistPage <= 1;
-    if (artistDpNext) artistDpNext.disabled = artistPage >= artistTotalPages;
+function updateArtistSongsPagination() {
+  if (!artistSongsPagination) return;
+  if (artistSongsTotalPages > 1) {
+    artistSongsPagination.classList.remove('hidden');
+    if (artistSongsDpLabel) artistSongsDpLabel.textContent = artistSongsPage + ' / ' + artistSongsTotalPages;
+    if (artistSongsDpPrev) artistSongsDpPrev.disabled = artistSongsPage <= 1;
+    if (artistSongsDpNext) artistSongsDpNext.disabled = artistSongsPage >= artistSongsTotalPages;
   } else {
-    artistPagination.classList.add('hidden');
+    artistSongsPagination.classList.add('hidden');
   }
 }
 
-if (artistDpPrev) {
-  artistDpPrev.addEventListener('click', () => {
-    if (artistPage > 1) {
-      loadArtistTracks(currentArtistName, artistPage - 1).then(() =>
-        artistTrackList.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+if (artistSongsDpPrev) {
+  artistSongsDpPrev.addEventListener('click', () => {
+    if (artistSongsPage > 1) {
+      loadArtistSongs(currentArtistName, artistSongsPage - 1).then(() =>
+        artistSongsList.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     }
   });
 }
-if (artistDpNext) {
-  artistDpNext.addEventListener('click', () => {
-    if (artistPage < artistTotalPages) {
-      loadArtistTracks(currentArtistName, artistPage + 1).then(() =>
-        artistTrackList.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+if (artistSongsDpNext) {
+  artistSongsDpNext.addEventListener('click', () => {
+    if (artistSongsPage < artistSongsTotalPages) {
+      loadArtistSongs(currentArtistName, artistSongsPage + 1).then(() =>
+        artistSongsList.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     }
   });
 }
