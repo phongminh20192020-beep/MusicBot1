@@ -209,56 +209,6 @@ function showDashboard() {
   connectSocket();
   renderGenres();
   loadDiscovery();
-  setupTilt(genresScroll, '.genre-card');
-  setupTilt(featuredGrid, '.featured-card');
-  setupTilt(discoverList, '.discover-row');
-  setupTilt(artistsGrid, '.artist-card');
-}
-
-// ── 3D mouse-tracked tilt ─────────────────────────────
-// Delegated on the stable parent container so it keeps working across
-// re-renders (innerHTML swaps) without needing to rebind per-card.
-function setupTilt(container, selector) {
-  if (!container) return;
-  const MAX_TILT = 9; // degrees
-
-  container.addEventListener('mousemove', (e) => {
-    const card = e.target.closest(selector);
-    if (!card || !container.contains(card)) return;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const px = (x / rect.width) - 0.5;
-    const py = (y / rect.height) - 0.5;
-    const rotateY = px * MAX_TILT * 2;
-    const rotateX = -py * MAX_TILT * 2;
-    card.style.transform =
-      'perspective(700px) translateY(-6px) scale(1.035) rotateX(' + rotateX.toFixed(2) + 'deg) rotateY(' + rotateY.toFixed(2) + 'deg)';
-  });
-
-  container.addEventListener('mouseout', (e) => {
-    const card = e.target.closest(selector);
-    if (!card) return;
-    const toCard = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest(selector) : null;
-    if (toCard === card) return; // moved within the same card
-    card.style.transform = '';
-  });
-
-  container.addEventListener('click', (e) => {
-    const card = e.target.closest(selector);
-    if (!card || !container.contains(card)) return;
-    const rect = card.getBoundingClientRect();
-    const ripple = document.createElement('span');
-    ripple.className = 'click-ripple';
-    const size = Math.max(rect.width, rect.height) * 1.3;
-    ripple.style.width = size + 'px';
-    ripple.style.height = size + 'px';
-    ripple.style.left = (e.clientX - rect.left) + 'px';
-    ripple.style.top = (e.clientY - rect.top) + 'px';
-    if (getComputedStyle(card).position === 'static') card.style.position = 'relative';
-    card.appendChild(ripple);
-    ripple.addEventListener('animationend', () => ripple.remove());
-  });
 }
 
 loginForm.addEventListener("submit", async e => {
