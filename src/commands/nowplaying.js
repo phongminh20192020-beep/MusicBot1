@@ -21,15 +21,17 @@ module.exports = {
     const bar      = track.info.isStream || !duration ? "🔴 LIVE" : progressBar(position, duration);
 
     const embed = new EmbedBuilder()
-      .setColor(0x8B4513)
+      .setColor(0xC4A484)
       .setTitle("Now Playing")
       .setDescription(`**[${track.info.title}](${track.info.uri})**`)
       .addFields(
         { name: "Author",       value: track.info.author || "Unknown",         inline: true },
         { name: "Requested By", value: track.requester?.username || "Unknown", inline: true },
         {
-          name:  "Progress",
-          value: `${bar}\n${track.info.isStream ? "🔴 LIVE" : `${formatDuration(position)} / ${formatDuration(duration)}`}`,
+          name:  "\u200b",
+          value: track.info.isStream
+            ? `🔴 LIVE  ${bar}`
+            : `${formatDuration(position)}  ${bar}  ${formatDuration(duration)}`,
         }
       )
       .setThumbnail(

@@ -45,7 +45,7 @@ module.exports = {
       return interaction.editReply({
         embeds: [
           new EmbedBuilder()
-            .setColor(0x8B4513)
+            .setColor(0xC4A484)
             .setTitle(`🎵 ${artist ? `${artist} — ` : ""}${title}`)
             .setDescription(lyrics),
         ],
@@ -56,7 +56,7 @@ module.exports = {
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()
-          .setColor(0x8B4513)
+          .setColor(0xC4A484)
           .setTitle(`🎵 ${artist ? `${artist} — ` : ""}${title}`)
           .setDescription(chunks[0])
           .setFooter({ text: `Page 1 of ${chunks.length}` }),
@@ -67,7 +67,7 @@ module.exports = {
       await interaction.followUp({
         embeds: [
           new EmbedBuilder()
-            .setColor(0x8B4513)
+            .setColor(0xC4A484)
             .setDescription(chunks[i])
             .setFooter({ text: `Page ${i + 1} of ${chunks.length}` }),
         ],

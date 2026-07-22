@@ -65,7 +65,7 @@ module.exports = {
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()
-          .setColor(0x8B4513)
+          .setColor(0xC4A484)
           .setTitle("Filter Applied")
           .setDescription(`**${labels[preset]}** is now active.`)
           .setFooter({ text: 'Use "/filter Off (Reset)" to remove all filters.' }),

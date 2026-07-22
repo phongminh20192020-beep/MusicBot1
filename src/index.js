@@ -122,15 +122,17 @@ function buildNowPlayingEmbed(player, track) {
   const bar = track.info.isStream || !dur ? "🔴 LIVE" : progressBar(pos, dur);
 
   return new EmbedBuilder()
-    .setColor(0x8B4513)
+    .setColor(0xC4A484)
     .setTitle("Now Playing")
     .setDescription(`**[${track.info.title}](${track.info.uri})**`)
     .addFields(
       { name: "Author",       value: track.info.author || "Unknown",         inline: true },
       { name: "Requested By", value: track.requester?.username || "Unknown", inline: true },
       {
-        name:  "Progress",
-        value: `${bar}\n${track.info.isStream ? "🔴 LIVE" : `${formatDuration(pos)} / ${formatDuration(dur)}`}`,
+        name:  "\u200b",
+        value: track.info.isStream
+          ? `🔴 LIVE  ${bar}`
+          : `${formatDuration(pos)}  ${bar}  ${formatDuration(dur)}`,
       }
     )
     .setThumbnail(
@@ -249,7 +251,7 @@ client.lavalink
     client.errorCounts.set(player.guildId, 0);
     client.retriedTracks.delete(player.guildId);
 
-    await setVoiceStatus(client, player.voiceChannelId, `🎵 ${track.info.title}`);
+    await setVoiceStatus(client, player.voiceChannelId, `<:NoName:1529477858307604540> ${track.info.title}`);
 
     const channel = client.channels.cache.get(player.textChannelId);
     if (!channel) return;

@@ -57,7 +57,7 @@ module.exports = {
         : formatDuration(current.info.duration);
 
       return new EmbedBuilder()
-        .setColor(0x8B4513)
+        .setColor(0xC4A484)
         .setTitle("Queue")
         .addFields(
           {

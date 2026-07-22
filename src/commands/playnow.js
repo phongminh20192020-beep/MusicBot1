@@ -72,7 +72,7 @@ module.exports = {
 
         return interaction.editReply({
           embeds: [new EmbedBuilder()
-            .setColor(0x8B4513)
+            .setColor(0xC4A484)
             .setTitle("▶ Playing Now (Spotify)")
             .setDescription(`**[${track.info.title}](${track.info.uri})**`)
             .addFields(
@@ -118,7 +118,7 @@ module.exports = {
 
     await interaction.editReply({
       embeds: [new EmbedBuilder()
-        .setColor(0x8B4513)
+        .setColor(0xC4A484)
         .setTitle("▶ Playing Now")
         .setDescription(`**[${track.info.title}](${track.info.uri})**`)
         .addFields(
