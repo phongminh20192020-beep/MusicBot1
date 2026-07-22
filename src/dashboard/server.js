@@ -1,6 +1,7 @@
 "use strict";
 
 const path    = require("path");
+const fs      = require("fs");
 const http    = require("http");
 const crypto  = require("crypto");
 const express = require("express");
@@ -856,6 +857,158 @@ function startDashboard(client) {
       res.json({ tracks });
     } catch (err) {
       console.error("[Dashboard] ytmsearch error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── Audio filter presets (mirrors /filter slash command) ─────────────
+  const VALID_FILTER_PRESETS = new Set([
+    "bassboost", "nightcore", "vaporwave", "slowed", "8d",
+    "karaoke", "tremolo", "vibrato", "lowpass", "pop", "off",
+  ]);
+
+  app.post("/api/players/:guildId/filter", requireAuth, async (req, res) => {
+    const p = getPlayerOr404(client, res, req.params.guildId);
+    if (!p) return;
+    const preset = String(req.body?.preset || "").toLowerCase();
+    if (!VALID_FILTER_PRESETS.has(preset)) {
+      return res.status(400).json({ error: "preset must be one of: " + [...VALID_FILTER_PRESETS].join(", ") });
+    }
+    const fm = p.filterManager;
+    try {
+      await fm.resetFilters();
+      switch (preset) {
+        case "bassboost": await fm.setEQPreset("BassboostMedium"); break;
+        case "nightcore": await fm.toggleNightcore();              break;
+        case "vaporwave": await fm.toggleVaporwave();              break;
+        case "slowed":    await fm.setSpeed(0.80); await fm.setPitch(0.90); break;
+        case "8d":        await fm.toggleRotation(0.2);            break;
+        case "karaoke":   await fm.toggleKaraoke();                break;
+        case "tremolo":   await fm.toggleTremolo();                break;
+        case "vibrato":   await fm.toggleVibrato();                break;
+        case "lowpass":   await fm.toggleLowPass();                break;
+        case "pop":       await fm.setEQPreset("Pop");             break;
+        case "off": break; // resetFilters() above already cleared everything
+      }
+    } catch (err) {
+      console.error("[Dashboard] filter error:", err.message);
+      return res.status(500).json({ error: err.message || "Failed to apply filter." });
+    }
+    res.json({ ok: true, preset });
+  });
+
+  // ─── Favorites (server-side, feeds the "suggested for you" list) ──────
+  // Single shared dashboard (no per-user login), so favorites are one
+  // shared list persisted to disk as JSON — survives process restarts.
+  const FAVORITES_FILE = path.join(__dirname, "..", "..", "data", "favorites.json");
+
+  function loadFavorites() {
+    try {
+      const raw = fs.readFileSync(FAVORITES_FILE, "utf8");
+      const data = JSON.parse(raw);
+      return Array.isArray(data.tracks) ? data.tracks : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveFavorites(tracks) {
+    try {
+      fs.mkdirSync(path.dirname(FAVORITES_FILE), { recursive: true });
+      fs.writeFileSync(FAVORITES_FILE, JSON.stringify({ tracks }, null, 2));
+    } catch (e) {
+      console.error("[Dashboard] Failed to save favorites:", e.message);
+    }
+  }
+
+  function favoriteKey(t) {
+    return (t.uri || `${t.artist}::${t.title}`).toLowerCase();
+  }
+
+  app.get("/api/favorites", requireAuth, (req, res) => {
+    res.json({ tracks: loadFavorites() });
+  });
+
+  app.post("/api/favorites", requireAuth, (req, res) => {
+    const { title, artist, uri, artwork, durationFmt } = req.body || {};
+    if (!title || !artist) return res.status(400).json({ error: "title and artist are required." });
+    const track = { title, artist, uri: uri || null, artwork: artwork || null, durationFmt: durationFmt || null, likedAt: Date.now() };
+    const key = favoriteKey(track);
+    const favorites = loadFavorites();
+    if (favorites.some(f => favoriteKey(f) === key)) {
+      return res.json({ ok: true, liked: true, tracks: favorites });
+    }
+    favorites.unshift(track);
+    saveFavorites(favorites);
+    res.json({ ok: true, liked: true, tracks: favorites });
+  });
+
+  app.delete("/api/favorites", requireAuth, (req, res) => {
+    const { title, artist, uri } = req.body || {};
+    const key = favoriteKey({ title, artist, uri });
+    const favorites = loadFavorites().filter(f => favoriteKey(f) !== key);
+    saveFavorites(favorites);
+    res.json({ ok: true, liked: false, tracks: favorites });
+  });
+
+  // ─── Favorites-based suggestions ("because you liked...") ─────────────
+  // Takes the artists you've favorited most, asks Last.fm for similar
+  // artists, and pulls each one's top track — a lightweight recommender
+  // with no extra infra.
+  const SUGGESTIONS_CACHE_TTL_MS = 15 * 60 * 1000;
+  let suggestionsCache = { key: null, tracks: [], fetchedAt: 0 };
+
+  app.get("/api/favorites/suggestions", requireAuth, async (req, res) => {
+    try {
+      const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 10));
+      const favorites = loadFavorites();
+      if (!favorites.length) return res.json({ tracks: [] });
+
+      // Rank favorited artists by how often they show up, most-liked first
+      const counts = new Map();
+      for (const f of favorites) {
+        const name = (f.artist || "").trim();
+        if (!name) continue;
+        counts.set(name, (counts.get(name) || 0) + 1);
+      }
+      const topArtists = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name]) => name);
+      const cacheKey = topArtists.join("|") + `::${limit}`;
+      if (suggestionsCache.key === cacheKey && Date.now() - suggestionsCache.fetchedAt < SUGGESTIONS_CACHE_TTL_MS) {
+        return res.json({ tracks: suggestionsCache.tracks });
+      }
+
+      const likedKeys = new Set(favorites.map(favoriteKey));
+      const seenArtists = new Set(topArtists.map(a => a.toLowerCase()));
+      const picked = [];
+
+      for (const artist of topArtists) {
+        try {
+          const simData = await lastfmFetch("artist.getSimilar", { artist, limit: "5" });
+          const similar = simData.similarartists?.artist || [];
+          for (const sim of similar.slice(0, 3)) {
+            const simName = sim.name;
+            if (!simName || seenArtists.has(simName.toLowerCase())) continue;
+            seenArtists.add(simName.toLowerCase());
+            try {
+              const topData = await lastfmFetch("artist.gettoptracks", { artist: simName, limit: "1" });
+              const top = topData.toptracks?.track?.[0];
+              if (!top) continue;
+              const track = lastfmTrackToJSON(top);
+              if (track && !likedKeys.has(favoriteKey(track))) picked.push(track);
+            } catch { /* skip this similar artist */ }
+            if (picked.length >= limit) break;
+          }
+        } catch (e) {
+          console.error("[Dashboard] getSimilar failed for", artist, ":", e.message);
+        }
+        if (picked.length >= limit) break;
+      }
+
+      const tracks = await enrichTracksWithArtwork(client, picked.slice(0, limit), limit);
+      suggestionsCache = { key: cacheKey, tracks, fetchedAt: Date.now() };
+      res.json({ tracks });
+    } catch (err) {
+      console.error("[Dashboard] favorites suggestions error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });

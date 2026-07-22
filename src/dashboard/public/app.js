@@ -58,6 +58,13 @@ const bpFill        = $("#bp-fill");
 const bpGuild       = $("#bp-guild");
 const bpPlaypause   = $("#bp-playpause");
 const bpVol         = $("#bp-vol");
+const bpLoop         = $("#bp-loop");
+const loopPanel       = $("#loop-panel");
+const loopOpts        = $("#loop-opts");
+const loopOptIndicator = $("#loop-opt-indicator");
+const loopPanelFilterBtn = $("#loop-panel-filter-btn");
+const loopPanelBack   = $("#loop-panel-back");
+const filterGrid       = $("#filter-grid");
 
 const viewHome      = $("#view-home");
 const viewQueue     = $("#view-queue");
@@ -71,6 +78,8 @@ const featuredLoading = $("#featured-loading");
 const discoverLoading = $("#discover-loading");
 const discoverBack       = $("#discover-back");
 const discoverList       = $("#discover-list");
+const suggestionsSection = $("#suggestions-section");
+const suggestionsList    = $("#suggestions-list");
 const discoverPagination = $("#discover-pagination");
 const dpPrev             = $("#dp-prev");
 const dpNext             = $("#dp-next");
@@ -143,6 +152,65 @@ function isValidImageUrl(url) {
 const FALLBACK_ARTWORK = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyMDAgMjAwJz48cmVjdCB3aWR0aD0nMjAwJyBoZWlnaHQ9JzIwMCcgZmlsbD0nIzFhMWEyZScvPjxjaXJjbGUgY3g9JzEwMCcgY3k9JzEwMCcgcj0nOTAnIGZpbGw9JyMxMjEyMmEnLz48cGF0aCBkPSdNODUgNjUgTDg1IDEzMCBRODUgMTQyIDc1IDE0NSBRNTggMTUwIDU1IDEzOCBRNTIgMTI1IDY4IDEyMCBMNzUgMTE4IEw3NSA3NSBMMTI1IDYyIEwxMjUgMTA4IFExMjUgMTIwIDExNSAxMjMgUTk4IDEyOCA5NSAxMTYgUTkyIDEwMyAxMDggOTggTDExNSA5NiBMMTE1IDU4IFonIGZpbGw9JyNlMGUwZTAnLz48L3N2Zz4=';
 const NO_SONG_ARTWORK = 'https://i.pinimg.com/736x/98/94/02/9894026f25ad6dac01c9b2315615e338.jpg';
 
+// ── Favorites ─────────────────────────────────────────
+let likedKeys = new Set();
+
+function favoriteKey(t) {
+  return ((t.uri || (t.artist + "::" + t.title)) || "").toLowerCase();
+}
+
+async function loadFavorites() {
+  try {
+    const res = await apiFetch("/api/favorites");
+    if (!res.ok) return;
+    const data = await res.json();
+    likedKeys = new Set((data.tracks || []).map(favoriteKey));
+  } catch { /* favorites are a nice-to-have, fail silently */ }
+}
+
+async function toggleFavorite(btn, track) {
+  const key = favoriteKey(track);
+  const nowLiked = !likedKeys.has(key);
+  // Optimistic UI update with a little pop
+  btn.classList.toggle('active', nowLiked);
+  const svg = btn.querySelector('svg');
+  if (svg) svg.setAttribute('fill', nowLiked ? 'currentColor' : 'none');
+  btn.classList.add('pop');
+  setTimeout(() => btn.classList.remove('pop'), 260);
+
+  try {
+    const res = await apiFetch("/api/favorites", {
+      method: nowLiked ? "POST" : "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: track.title, artist: track.artist, uri: track.uri, artwork: track.artwork, durationFmt: track.durationFmt }),
+    });
+    if (!res.ok) throw new Error("Favorite request failed");
+    if (nowLiked) likedKeys.add(key); else likedKeys.delete(key);
+    toast(nowLiked ? "Added to favorites" : "Removed from favorites");
+    loadSuggestions();
+  } catch {
+    // Revert on failure
+    btn.classList.toggle('active', !nowLiked);
+    if (svg) svg.setAttribute('fill', !nowLiked ? 'currentColor' : 'none');
+    toast("Couldn't update favorites", {type:"error"});
+  }
+}
+
+async function loadSuggestions() {
+  if (!suggestionsSection || !suggestionsList) return;
+  try {
+    const res = await apiFetch("/api/favorites/suggestions?limit=10");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const tracks = data.tracks || [];
+    if (!tracks.length) { suggestionsSection.classList.add('hidden'); return; }
+    suggestionsSection.classList.remove('hidden');
+    renderDiscover(tracks, suggestionsList);
+  } catch {
+    suggestionsSection.classList.add('hidden');
+  }
+}
+
 
 function toast(message, opts) {
   opts = opts || {};
@@ -208,6 +276,7 @@ function showDashboard() {
   dashboard.classList.remove("hidden");
   connectSocket();
   renderGenres();
+  loadFavorites().then(loadSuggestions);
   loadDiscovery();
 }
 
@@ -625,17 +694,19 @@ function renderFeatured(tracks) {
  * Replacing discoverList.innerHTML drops the previous page's <img> elements
  * from the DOM, so the browser frees those images from memory/decoded cache.
  */
-function renderDiscover(tracks) {
-  if (!discoverList) return;
+function renderDiscover(tracks, container) {
+  container = container || discoverList;
+  if (!container) return;
 
   if (!tracks.length) {
-    discoverList.innerHTML = '<div class="discover-empty">No tracks found</div>';
-    if (discoverPagination) discoverPagination.classList.add('hidden');
+    container.innerHTML = '<div class="discover-empty">No tracks found</div>';
+    if (container === discoverList && discoverPagination) discoverPagination.classList.add('hidden');
     return;
   }
 
-  discoverList.innerHTML = tracks.map((t) => {
+  container.innerHTML = tracks.map((t) => {
     const src = isValidImageUrl(t.artwork) ? escapeHtml(t.artwork) : FALLBACK_ARTWORK;
+    const liked = likedKeys.has(favoriteKey(t));
     return '<div class="discover-row" data-uri="' + escapeHtml(t.uri || '') + '">' +
       '<div class="dr-art-wrap">' +
         '<img class="dr-art" src="' + src + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=FALLBACK_ARTWORK;">' +
@@ -649,7 +720,7 @@ function renderDiscover(tracks) {
         '<div class="dr-meta-row">' +
           '<span class="dr-dur">' + escapeHtml(t.durationFmt || "3:45") + '</span>' +
           '<span style="display:flex;gap:2px;">' +
-            '<button class="dr-btn dr-like" title="Like"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg></button>' +
+            '<button class="dr-btn dr-like' + (liked ? ' active' : '') + '" title="Like"><svg viewBox="0 0 24 24" width="14" height="14" fill="' + (liked ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"></path></svg></button>' +
             '<button class="dr-btn dr-more" title="Add to queue">+</button>' +
           '</span>' +
         '</div>' +
@@ -657,7 +728,8 @@ function renderDiscover(tracks) {
     '</div>';
   }).join('');
 
-  discoverList.querySelectorAll('.discover-row').forEach(row => {
+  container.querySelectorAll('.discover-row').forEach((row, i) => {
+    const t = tracks[i];
     row.addEventListener('click', e => {
       if (e.target.closest('.dr-btn') || e.target.closest('.dr-play')) return;
       playUri(row.dataset.uri, row.querySelector('.dr-title').textContent);
@@ -666,9 +738,11 @@ function renderDiscover(tracks) {
     if (playBtn) playBtn.addEventListener('click', () => playUri(row.dataset.uri, row.querySelector('.dr-title').textContent));
     const moreBtn = row.querySelector('.dr-more');
     if (moreBtn) moreBtn.addEventListener('click', () => playUri(row.dataset.uri, row.querySelector('.dr-title').textContent));
+    const likeBtn = row.querySelector('.dr-like');
+    if (likeBtn) likeBtn.addEventListener('click', () => toggleFavorite(likeBtn, t));
   });
 
-  updatePaginationUI();
+  if (container === discoverList) updatePaginationUI();
 }
 
 function updatePaginationUI() {
@@ -845,6 +919,7 @@ function updateBottomPlayer(player) {
   bpPlaypause.innerHTML = player.paused ? PLAY_ICON : PAUSE_ICON;
   bpPlaypause.title = player.paused ? "Resume" : "Pause";
   bpVol.value = player.volume || 100;
+  bpLoop.classList.toggle('active', !!player.repeatMode && player.repeatMode !== "off");
 }
 
 function collapseBottomPlayer() {
@@ -868,8 +943,95 @@ bpPlaypause.addEventListener('click', () => {
 
 $("#bp-next").addEventListener('click', () => sendCmd('skip'));
 $("#bp-prev").addEventListener('click', () => toast("Previous not implemented", {type:"error"}));
-$("#bp-loop").addEventListener('click', () => sendCmd('loop'));
-$("#bp-shuffle").addEventListener('click', () => sendCmd('shuffle'));
+$("#bp-shuffle").addEventListener('click', () => sendCmd('shuffle', {}).then(ok => { if (ok) toast("Queue shuffled"); }));
+
+// ── Loop mode + audio filter popover ─────────────────
+const FILTER_PRESETS = [
+  { id: "off",       label: "Off (Reset)" },
+  { id: "bassboost", label: "Bass Boost" },
+  { id: "nightcore",  label: "Nightcore" },
+  { id: "vaporwave",  label: "Vaporwave" },
+  { id: "slowed",     label: "Slowed" },
+  { id: "8d",         label: "8D Audio" },
+  { id: "karaoke",    label: "Karaoke" },
+  { id: "tremolo",    label: "Tremolo" },
+  { id: "vibrato",    label: "Vibrato" },
+  { id: "lowpass",    label: "Low Pass" },
+  { id: "pop",        label: "Pop" },
+];
+
+let activeFilterPreset = "off";
+
+filterGrid.innerHTML = FILTER_PRESETS.map(f =>
+  '<button class="filter-chip" data-preset="' + f.id + '"><span class="filter-dot"></span>' + escapeHtml(f.label) + '</button>'
+).join('');
+
+function setActiveLoopOpt(mode) {
+  loopOpts.querySelectorAll('.loop-opt').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
+  const activeBtn = loopOpts.querySelector('.loop-opt[data-mode="' + mode + '"]');
+  if (activeBtn) {
+    const idx = [...loopOpts.querySelectorAll('.loop-opt')].indexOf(activeBtn);
+    loopOptIndicator.style.transform = 'translateY(' + (idx * 36) + 'px)';
+  }
+}
+
+function setActiveFilterChip(preset) {
+  activeFilterPreset = preset;
+  filterGrid.querySelectorAll('.filter-chip').forEach(chip => chip.classList.toggle('active', chip.dataset.preset === preset));
+}
+
+function openLoopPanel() {
+  loopPanel.classList.add('open');
+  bpLoop.classList.add('panel-open');
+  const player = currentPlayers.find(p => p.guildId === activeGuildId);
+  setActiveLoopOpt(player?.repeatMode || "off");
+}
+
+function closeLoopPanel() {
+  loopPanel.classList.remove('open', 'showing-filters');
+  bpLoop.classList.remove('panel-open');
+}
+
+bpLoop.addEventListener('click', e => {
+  e.stopPropagation();
+  loopPanel.classList.contains('open') ? closeLoopPanel() : openLoopPanel();
+});
+
+loopPanelFilterBtn.addEventListener('click', () => loopPanel.classList.add('showing-filters'));
+loopPanelBack.addEventListener('click', () => loopPanel.classList.remove('showing-filters'));
+
+loopOpts.addEventListener('click', e => {
+  const btn = e.target.closest('.loop-opt');
+  if (!btn) return;
+  const mode = btn.dataset.mode;
+  setActiveLoopOpt(mode);
+  sendCmd('loop', { mode }).then(ok => { if (ok) toast("Loop: " + btn.querySelector('span').textContent); });
+  closeLoopPanel();
+});
+
+filterGrid.addEventListener('click', e => {
+  const chip = e.target.closest('.filter-chip');
+  if (!chip) return;
+  if (!activeGuildId) { toast("No active player", {type:"error"}); return; }
+  const preset = chip.dataset.preset;
+  setActiveFilterChip(preset);
+  apiFetch("/api/players/" + activeGuildId + "/filter", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ preset }),
+  }).then(async res => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { toast(data.error || "Filter failed", {type:"error"}); return; }
+    toast(preset === "off" ? "Filters reset" : "Filter: " + chip.textContent.trim());
+  }).catch(() => toast("Connection issue", {type:"error"}));
+});
+
+document.addEventListener('click', e => {
+  if (loopPanel.classList.contains('open') && !e.target.closest('.loop-wrap')) closeLoopPanel();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLoopPanel();
+});
 
 bpVol.addEventListener('change', () => {
   if (!activeGuildId) return;
@@ -883,15 +1045,16 @@ bottomPlayer.addEventListener('click', e => {
 });
 
 async function sendCmd(action, body) {
-  if (!activeGuildId) { toast("No active player", {type:"error"}); return; }
+  if (!activeGuildId) { toast("No active player", {type:"error"}); return false; }
   try {
     const res = await apiFetch("/api/players/" + activeGuildId + "/" + action, {
       method: "POST",
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (!res.ok) { const data = await res.json().catch(()=>({})); toast(data.error || "Command failed", {type:"error"}); }
-  } catch (e) { toast("Connection issue", {type:"error"}); }
+    if (!res.ok) { const data = await res.json().catch(()=>({})); toast(data.error || "Command failed", {type:"error"}); return false; }
+    return true;
+  } catch (e) { toast("Connection issue", {type:"error"}); return false; }
 }
 
 // ── Global Search ────────────────────────────────────
