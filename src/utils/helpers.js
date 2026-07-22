@@ -195,6 +195,22 @@ async function clearVoiceStatus(client, channelId) {
     .catch(() => {});
 }
 
+// ─── Bot presence ("Listening to ...") ────────────────────────────────────────
+// This is the bot's own Discord status (shown under its name in the member
+// list / profile), NOT the voice channel status text set above.
+
+const IDLE_ACTIVITY = { name: "music <:NoName:1529477858307604540>", type: 2 }; // Listening
+
+function setListeningPresence(client, songName) {
+  if (!client.user || !songName) return;
+  client.user.setActivity(songName, { type: 2 }); // 2 = ActivityType.Listening
+}
+
+function resetPresence(client) {
+  if (!client.user) return;
+  client.user.setActivity(IDLE_ACTIVITY.name, { type: IDLE_ACTIVITY.type });
+}
+
 /**
  * Pick the best match from a list of Lavalink search results for a given
  * target duration (ms). Prefers the closest duration within a 5s tolerance;
@@ -230,4 +246,6 @@ module.exports = {
   extractSpotifyId,
   setVoiceStatus,
   clearVoiceStatus,
+  setListeningPresence,
+  resetPresence,
 };

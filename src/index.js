@@ -4,7 +4,7 @@ const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require("discord
 const { LavalinkManager } = require("lavalink-client");
 const fs   = require("fs");
 const path = require("path");
-const { formatDuration, progressBar, resolveSpotify, pickBestTrackMatch, getSpotifyRecommendations, extractSpotifyId, setVoiceStatus, clearVoiceStatus } = require("./utils/helpers");
+const { formatDuration, progressBar, resolveSpotify, pickBestTrackMatch, getSpotifyRecommendations, extractSpotifyId, setVoiceStatus, clearVoiceStatus, setListeningPresence, resetPresence } = require("./utils/helpers");
 const { purgeExpired } = require("./utils/queueStore");
 const mvStreamer = require("./stream/mvStreamer");
 const { startDashboard } = require("./dashboard/server");
@@ -252,6 +252,7 @@ client.lavalink
     client.retriedTracks.delete(player.guildId);
 
     await setVoiceStatus(client, player.voiceChannelId, `<:NoName:1529477858307604540> ${track.info.title}`);
+    setListeningPresence(client, track.info.title);
 
     const channel = client.channels.cache.get(player.textChannelId);
     if (!channel) return;
@@ -345,6 +346,7 @@ client.lavalink
     // AFK mode — stay in channel, do nothing
     if (player.get("afk")) {
       console.log(`[Autoplay] Queue ended in guild ${guildId} — staying in channel (AFK mode)`);
+      resetPresence(client);
       return;
     }
 
@@ -362,8 +364,11 @@ client.lavalink
       // Check if recommendations were added
       if (player.queue.tracks.length > 0) {
         console.log(`[Autoplay] Successfully queued recommendations. Queue size: ${player.queue.tracks.length}`);
-        const textChannel = client.channels.cache.get(textChannelId);
-        textChannel?.send("🎵 **Autoplay activated!** Now playing recommendations based on your music...").catch(() => {});
+        if (!player.get("autoplayAnnounced")) {
+          player.set("autoplayAnnounced", true);
+          const textChannel = client.channels.cache.get(textChannelId);
+          textChannel?.send("🎵 **Autoplay activated!** Now playing recommendations based on your music...").catch(() => {});
+        }
         return;
       } else {
         console.warn("[Autoplay] No recommendations were generated");
@@ -373,7 +378,9 @@ client.lavalink
     }
 
     // Fallback: queue has ended, no autoplay possible
+    player.set("autoplayAnnounced", false);
     await clearVoiceStatus(client, player.voiceChannelId);
+    resetPresence(client);
     client.channels.cache.get(textChannelId)
       ?.send("✅ Queue finished! Use `/play` to add more tracks for non-stop music.").catch(() => {});
   });

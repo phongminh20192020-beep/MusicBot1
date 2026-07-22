@@ -1,7 +1,7 @@
 "use strict";
 
 const { SlashCommandBuilder } = require("discord.js");
-const { clearVoiceStatus }    = require("../utils/helpers");
+const { clearVoiceStatus, resetPresence } = require("../utils/helpers");
 const { saveQueue }           = require("../utils/queueStore");
 
 module.exports = {
@@ -21,11 +21,13 @@ module.exports = {
 
     // Reset AFK mode
     player.set("afk", false);
+    player.set("autoplayAnnounced", false);
 
     // Save queue to disk before destroying
     if (trackCount > 0) saveQueue(player);
 
     await clearVoiceStatus(client, player.voiceChannelId);
+    resetPresence(client);
     await player.destroy();
 
     await interaction.editReply(
