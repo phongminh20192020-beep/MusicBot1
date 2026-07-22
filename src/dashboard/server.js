@@ -18,22 +18,40 @@ const VALID_LOOP_MODES = new Set(["off", "track", "queue"]);
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const searchCache = new Map();
 
-// ── Rate limiting ────────────────────────────────────
-const loginAttempts = new Map();
-const RATE_LIMIT_MAX = 5;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+// ── Login IP ban (5 wrong passwords = 5 minute ban) ──
+const loginAttempts = new Map(); // ip -> { failCount, bannedUntil }
+const FAILED_LOGIN_LIMIT = 5;
+const FAILED_LOGIN_BAN_MS = 5 * 60 * 1000;
 
-function checkRateLimit(ip) {
-  const now = Date.now();
+function getBanStatus(ip) {
   const entry = loginAttempts.get(ip);
-  if (!entry || now > entry.resetAt) {
-    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+  if (!entry || !entry.bannedUntil) return { banned: false };
+  if (Date.now() >= entry.bannedUntil) {
+    loginAttempts.delete(ip); // ban expired, wipe the slate for this IP
+    return { banned: false };
   }
-  entry.count++;
-  const remaining = Math.max(0, RATE_LIMIT_MAX - entry.count);
-  return { allowed: entry.count <= RATE_LIMIT_MAX, remaining };
+  return { banned: true, msRemaining: entry.bannedUntil - Date.now() };
 }
+
+function recordFailedLogin(ip) {
+  const entry = loginAttempts.get(ip) || { failCount: 0, bannedUntil: null };
+  entry.failCount++;
+  if (entry.failCount >= FAILED_LOGIN_LIMIT) entry.bannedUntil = Date.now() + FAILED_LOGIN_BAN_MS;
+  loginAttempts.set(ip, entry);
+  return entry;
+}
+
+function clearLoginAttempts(ip) {
+  loginAttempts.delete(ip);
+}
+
+// Sweep stale (never-banned, long-idle) entries so the Map doesn't grow forever
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of loginAttempts) {
+    if (entry.bannedUntil && now >= entry.bannedUntil) loginAttempts.delete(ip);
+  }
+}, 60 * 1000).unref();
 
 function hashPassword(pw) {
   return crypto.createHash("sha256").update(pw).digest("hex");
@@ -411,20 +429,28 @@ function startDashboard(client) {
       return res.status(503).json({ error: "Dashboard password not configured on server. Set DASHBOARD_PASSWORD env var." });
     }
 
-    const limit = checkRateLimit(clientIp);
-    if (!limit.allowed) {
-      console.warn("[Dashboard] Rate limit hit for IP:", clientIp);
-      return res.status(429).json({ error: "Too many attempts. Try again in 15 minutes." });
+    const ban = getBanStatus(clientIp);
+    if (ban.banned) {
+      const minsLeft = Math.max(1, Math.ceil(ban.msRemaining / 60000));
+      console.warn("[Dashboard] Blocked login attempt from banned IP:", clientIp);
+      return res.status(429).json({ error: "Too many failed attempts. IP banned — try again in " + minsLeft + " minute" + (minsLeft === 1 ? "" : "s") + "." });
     }
 
     const inputHash = hashPassword(password || "");
     const expectedHash = PASSWORD.length === 64 ? PASSWORD : hashPassword(PASSWORD);
 
     if (typeof password !== "string" || inputHash !== expectedHash) {
-      console.warn("[Dashboard] Login failed: wrong password from", clientIp, "remaining:", limit.remaining);
-      return res.status(401).json({ error: "Incorrect password. " + limit.remaining + " attempts remaining." });
+      const entry = recordFailedLogin(clientIp);
+      if (entry.bannedUntil) {
+        console.warn("[Dashboard] IP banned for 5 minutes after 5 failed attempts:", clientIp);
+        return res.status(429).json({ error: "Too many failed attempts. IP banned for 5 minutes." });
+      }
+      const remaining = FAILED_LOGIN_LIMIT - entry.failCount;
+      console.warn("[Dashboard] Login failed: wrong password from", clientIp, "remaining:", remaining);
+      return res.status(401).json({ error: "Incorrect password. " + remaining + " attempt" + (remaining === 1 ? "" : "s") + " remaining." });
     }
 
+    clearLoginAttempts(clientIp);
     console.log("[Dashboard] Login successful from", clientIp);
     const token = createSession();
     res.cookie(COOKIE_NAME, token, { httpOnly: true, sameSite: "lax", maxAge: 1000*60*60*24*7, path: "/" });
