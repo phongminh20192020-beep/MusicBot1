@@ -1464,6 +1464,54 @@ input {
   justify-content: flex-end;
 }
 
+.suggestions-modal-card {
+  max-width: 560px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--surface-2);
+  border: none;
+  border-radius: 50%;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, transform .15s ease;
+}
+
+.modal-close:hover {
+  background: var(--surface-3);
+  color: var(--text);
+  transform: rotate(90deg);
+}
+
+.suggestions-modal-card .discover-list {
+  grid-template-columns: repeat(3, 1fr);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 /* ══════════════════════════════════════════════════════
    ACCESSIBILITY & MOTION
 ════════════════════════════════════════════════════════ */

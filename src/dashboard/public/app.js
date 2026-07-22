@@ -82,6 +82,9 @@ const discoverList       = $("#discover-list");
 const suggestionsSection = $("#suggestions-section");
 const suggestionsList    = $("#suggestions-list");
 const suggestionsSeeAll  = $("#suggestions-see-all");
+const suggestionsModal     = $("#suggestions-modal");
+const suggestionsModalList = $("#suggestions-modal-list");
+const suggestionsModalClose = $("#suggestions-modal-close");
 const discoverPagination = $("#discover-pagination");
 const dpPrev             = $("#dp-prev");
 const dpNext             = $("#dp-next");
@@ -222,10 +225,24 @@ async function loadSuggestions() {
 
 if (suggestionsSeeAll) {
   suggestionsSeeAll.addEventListener('click', () => {
-    renderDiscover(allSuggestedTracks, suggestionsList);
-    suggestionsSeeAll.classList.add('hidden');
+    renderDiscover(allSuggestedTracks, suggestionsModalList);
+    suggestionsModal.classList.remove('hidden');
   });
 }
+
+function closeSuggestionsModal() {
+  suggestionsModal.classList.add('hidden');
+}
+
+if (suggestionsModalClose) suggestionsModalClose.addEventListener('click', closeSuggestionsModal);
+if (suggestionsModal) {
+  suggestionsModal.addEventListener('click', e => {
+    if (e.target === suggestionsModal) closeSuggestionsModal();
+  });
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && suggestionsModal && !suggestionsModal.classList.contains('hidden')) closeSuggestionsModal();
+});
 
 
 function toast(message, opts) {
