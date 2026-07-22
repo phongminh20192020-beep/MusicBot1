@@ -25,10 +25,12 @@ module.exports = {
       .setTitle("Now Playing")
       .setDescription(`**[${track.info.title}](${track.info.uri})**`)
       .addFields(
-        { name: "Author",       value: track.info.author || "Unknown",                                                                    inline: true },
-        { name: "Duration",     value: track.info.isStream ? "🔴 LIVE" : `${formatDuration(position)} / ${formatDuration(duration)}`,     inline: true },
-        { name: "Requested By", value: track.requester?.username || "Unknown",                                                            inline: true },
-        { name: "Progress",     value: bar }
+        { name: "Author",       value: track.info.author || "Unknown",         inline: true },
+        { name: "Requested By", value: track.requester?.username || "Unknown", inline: true },
+        {
+          name:  "Progress",
+          value: `${bar}\n${track.info.isStream ? "🔴 LIVE" : `${formatDuration(position)} / ${formatDuration(duration)}`}`,
+        }
       )
       .setThumbnail(
         track.info.artworkUrl?.trim() ||

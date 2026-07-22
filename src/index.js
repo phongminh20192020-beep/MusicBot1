@@ -126,10 +126,12 @@ function buildNowPlayingEmbed(player, track) {
     .setTitle("Now Playing")
     .setDescription(`**[${track.info.title}](${track.info.uri})**`)
     .addFields(
-      { name: "Author",       value: track.info.author || "Unknown",                                                       inline: true },
-      { name: "Duration",     value: track.info.isStream ? "🔴 LIVE" : `${formatDuration(pos)} / ${formatDuration(dur)}`, inline: true },
-      { name: "Requested By", value: track.requester?.username || "Unknown",                                               inline: true },
-      { name: "Progress",     value: bar }
+      { name: "Author",       value: track.info.author || "Unknown",         inline: true },
+      { name: "Requested By", value: track.requester?.username || "Unknown", inline: true },
+      {
+        name:  "Progress",
+        value: `${bar}\n${track.info.isStream ? "🔴 LIVE" : `${formatDuration(pos)} / ${formatDuration(dur)}`}`,
+      }
     )
     .setThumbnail(
       track.info.artworkUrl?.trim() ||
