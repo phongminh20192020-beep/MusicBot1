@@ -16,13 +16,17 @@ function formatDuration(ms) {
 /**
  * Build a playback progress bar string
  */
-function progressBar(position, duration, length = 20) {
-  const filled = Math.min(length, Math.round((position / duration) * length));
-  return (
-    "▬".repeat(Math.max(0, filled - 1)) +
-    "🔘" +
-    "▬".repeat(Math.max(0, length - filled))
-  );
+function progressBar(position, duration, length = 12) {
+  const LINE     = "<:ProgessBarLine:1529472129697845378>";
+  const DOT_LINE = "<:ProgessBarDotandLine:1529472131417505912>";
+
+  const dotIndex = Math.min(length - 1, Math.max(0, Math.round((position / duration) * (length - 1))));
+
+  let bar = "";
+  for (let i = 0; i < length; i++) {
+    bar += i === dotIndex ? DOT_LINE : LINE;
+  }
+  return bar;
 }
 
 // ─── Spotify Client Credentials token ────────────────────────────────────────

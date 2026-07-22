@@ -121,22 +121,14 @@ function buildNowPlayingEmbed(player, track) {
   const dur = track.info.duration || 0;
   const bar = track.info.isStream || !dur ? "🔴 LIVE" : progressBar(pos, dur);
 
-  const sourceName = track.info.sourceName || "unknown";
-  const sourceBadge =
-    sourceName === "spotify"      ? "🟢 Spotify"  :
-    sourceName === "youtube"      ? "🔴 YouTube"  :
-    sourceName === "youtubemusic" ? "🎵 YT Music" :
-    `📻 ${sourceName}`;
-
   return new EmbedBuilder()
-    .setColor(sourceName === "spotify" ? 0x1db954 : 0xff0000)
+    .setColor(0x8B4513)
     .setTitle("Now Playing")
     .setDescription(`**[${track.info.title}](${track.info.uri})**`)
     .addFields(
       { name: "Author",       value: track.info.author || "Unknown",                                                       inline: true },
       { name: "Duration",     value: track.info.isStream ? "🔴 LIVE" : `${formatDuration(pos)} / ${formatDuration(dur)}`, inline: true },
       { name: "Requested By", value: track.requester?.username || "Unknown",                                               inline: true },
-      { name: "Source",       value: sourceBadge,                                                                          inline: true },
       { name: "Progress",     value: bar }
     )
     .setThumbnail(

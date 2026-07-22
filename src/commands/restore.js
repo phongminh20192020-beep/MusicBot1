@@ -62,7 +62,7 @@ module.exports = {
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()
-          .setColor(0x1db954)
+          .setColor(0x8B4513)
           .setTitle("✅ Queue Restored")
           .setDescription(
             `Restored **${allTracks.length}** track${allTracks.length !== 1 ? "s" : ""}.\n` +

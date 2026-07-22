@@ -21,7 +21,7 @@ module.exports = {
     const bar      = track.info.isStream || !duration ? "🔴 LIVE" : progressBar(position, duration);
 
     const embed = new EmbedBuilder()
-      .setColor(0xff0000)
+      .setColor(0x8B4513)
       .setTitle("Now Playing")
       .setDescription(`**[${track.info.title}](${track.info.uri})**`)
       .addFields(

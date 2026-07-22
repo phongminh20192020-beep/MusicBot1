@@ -59,7 +59,7 @@ module.exports = {
         const prompt = await interaction.editReply({
           embeds: [
             new EmbedBuilder()
-              .setColor(0xff0000)
+              .setColor(0x8B4513)
               .setTitle("🎵 Restore Previous Queue?")
               .setDescription(
                 `Found a saved queue from **${savedDate}**.\n` +
@@ -97,7 +97,7 @@ module.exports = {
             await interaction.editReply({
               embeds: [
                 new EmbedBuilder()
-                  .setColor(0x1db954)
+                  .setColor(0x8B4513)
                   .setTitle("✅ Queue Restored")
                   .setDescription(`Restored **${allTracks.length}** track${allTracks.length !== 1 ? "s" : ""}. Enjoy! 🎵`),
               ],
@@ -150,7 +150,7 @@ module.exports = {
           return interaction.editReply({
             embeds: [
               new EmbedBuilder()
-                .setColor(0x1db954)
+                .setColor(0x8B4513)
                 .setTitle("Spotify Playlist Added")
                 .setDescription(`Added **${res.tracks.length}** tracks from **${res.playlist?.name || "playlist"}** to the queue.`),
             ],
@@ -167,7 +167,7 @@ module.exports = {
         return interaction.editReply({
           embeds: [
             new EmbedBuilder()
-              .setColor(0x1db954)
+              .setColor(0x8B4513)
               .setTitle("Added to Queue (Spotify)")
               .setDescription(`**[${track.info.title}](${track.info.uri})**`)
               .addFields(
@@ -216,7 +216,7 @@ module.exports = {
         return interaction.editReply({
           embeds: [
             new EmbedBuilder()
-              .setColor(0x1db954)
+              .setColor(0x8B4513)
               .setTitle("Added to Queue (via Spotify)")
               .setDescription(`**[${track.info.title}](${track.info.uri})**`)
               .addFields(
@@ -237,7 +237,7 @@ module.exports = {
       await interaction.editReply({
         embeds: [
           new EmbedBuilder()
-            .setColor(0x1db954)
+            .setColor(0x8B4513)
             .setTitle("⏳ Loading Spotify Playlist...")
             .setDescription(`Found **${tracks.length}** tracks in **${name}**.\nSearching and queuing — playback starts as soon as the first track is ready.`),
         ],
@@ -265,7 +265,7 @@ module.exports = {
         interaction.editReply({
           embeds: [
             new EmbedBuilder()
-              .setColor(0x1db954)
+              .setColor(0x8B4513)
               .setTitle("✅ Playlist Queued")
               .setDescription(`Added **${added}/${tracks.length}** tracks from **${name}** to the queue.`),
           ],
@@ -292,7 +292,7 @@ module.exports = {
       return interaction.editReply({
         embeds: [
           new EmbedBuilder()
-            .setColor(0xff0000)
+            .setColor(0x8B4513)
             .setTitle("Playlist Added")
             .setDescription(`Added **${res.tracks.length}** tracks from **${res.playlist?.name || "playlist"}** to the queue.`),
         ],
@@ -309,7 +309,7 @@ module.exports = {
     return interaction.editReply({
       embeds: [
         new EmbedBuilder()
-          .setColor(0xff0000)
+          .setColor(0x8B4513)
           .setTitle("Added to Queue")
           .setDescription(`**[${track.info.title}](${track.info.uri})**`)
           .addFields(
