@@ -69,6 +69,7 @@ const filterGrid       = $("#filter-grid");
 const viewHome      = $("#view-home");
 const viewQueue     = $("#view-queue");
 const viewHistory   = $("#view-history");
+const viewFavorites = $("#view-favorites");
 const genresScroll  = $("#genres-scroll");
 const artistsGrid    = $("#artists-grid");
 const artistsLoading = $("#artists-loading");
@@ -80,6 +81,7 @@ const discoverBack       = $("#discover-back");
 const discoverList       = $("#discover-list");
 const suggestionsSection = $("#suggestions-section");
 const suggestionsList    = $("#suggestions-list");
+const suggestionsSeeAll  = $("#suggestions-see-all");
 const discoverPagination = $("#discover-pagination");
 const dpPrev             = $("#dp-prev");
 const dpNext             = $("#dp-next");
@@ -188,6 +190,7 @@ async function toggleFavorite(btn, track) {
     if (nowLiked) likedKeys.add(key); else likedKeys.delete(key);
     toast(nowLiked ? "Added to favorites" : "Removed from favorites");
     loadSuggestions();
+    if (currentView === 'favorites') renderFavoritesView();
   } catch {
     // Revert on failure
     btn.classList.toggle('active', !nowLiked);
@@ -196,19 +199,32 @@ async function toggleFavorite(btn, track) {
   }
 }
 
+let allSuggestedTracks = [];
+
 async function loadSuggestions() {
   if (!suggestionsSection || !suggestionsList) return;
   try {
-    const res = await apiFetch("/api/favorites/suggestions?limit=10");
+    const res = await apiFetch("/api/favorites/suggestions?limit=20");
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    const tracks = data.tracks || [];
-    if (!tracks.length) { suggestionsSection.classList.add('hidden'); return; }
+    allSuggestedTracks = data.tracks || [];
+    if (!allSuggestedTracks.length) { suggestionsSection.classList.add('hidden'); return; }
     suggestionsSection.classList.remove('hidden');
-    renderDiscover(tracks, suggestionsList);
+    renderDiscover(allSuggestedTracks.slice(0, 5), suggestionsList);
+    if (suggestionsSeeAll) {
+      suggestionsSeeAll.classList.toggle('hidden', allSuggestedTracks.length <= 5);
+      suggestionsSeeAll.textContent = "See all " + allSuggestedTracks.length + " suggested songs";
+    }
   } catch {
     suggestionsSection.classList.add('hidden');
   }
+}
+
+if (suggestionsSeeAll) {
+  suggestionsSeeAll.addEventListener('click', () => {
+    renderDiscover(allSuggestedTracks, suggestionsList);
+    suggestionsSeeAll.classList.add('hidden');
+  });
 }
 
 
@@ -345,6 +361,10 @@ function switchView(view) {
     case 'history':
       viewHistory.classList.remove('hidden');
       renderHistoryView();
+      break;
+    case 'favorites':
+      viewFavorites.classList.remove('hidden');
+      renderFavoritesView();
       break;
     default:
       viewHome.classList.remove('hidden');
@@ -832,6 +852,31 @@ function renderHistoryView() {
   viewHistory.innerHTML = html;
 }
 
+async function renderFavoritesView() {
+  if (!viewFavorites) return;
+  viewFavorites.innerHTML = '<h2 class="discover-title" style="margin-bottom:16px;">Favorites</h2>' +
+    '<div class="discover-list" id="favorites-list"></div>';
+  const list = $("#favorites-list");
+  list.innerHTML = Array(4).fill(0).map(() => '<div class="skeleton discover-row" style="aspect-ratio:1/1.35;"></div>').join('');
+  try {
+    const res = await apiFetch("/api/favorites");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const tracks = data.tracks || [];
+    likedKeys = new Set(tracks.map(favoriteKey));
+    if (!tracks.length) {
+      viewFavorites.innerHTML = '<h2 class="discover-title" style="margin-bottom:16px;">Favorites</h2>' +
+        '<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;">' +
+        '<div class="empty-icon"><svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>' +
+        '<h3>No favorites yet</h3><p>Tap the heart on any song to save it here.</p></div>';
+      return;
+    }
+    renderDiscover(tracks, list);
+  } catch (e) {
+    viewFavorites.innerHTML = '<h2 class="discover-title" style="margin-bottom:16px;">Favorites</h2><div class="discover-empty">Error loading favorites</div>';
+  }
+}
+
 // ── Socket ───────────────────────────────────────────
 function connectSocket() {
   if (socket) return;
@@ -1027,7 +1072,7 @@ filterGrid.addEventListener('click', e => {
 });
 
 document.addEventListener('click', e => {
-  if (loopPanel.classList.contains('open') && !e.target.closest('.loop-wrap')) closeLoopPanel();
+  if (loopPanel.classList.contains('open') && !e.target.closest('.loop-popover-wrap')) closeLoopPanel();
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeLoopPanel();

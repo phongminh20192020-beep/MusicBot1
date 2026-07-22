@@ -2443,7 +2443,7 @@ html.is-mobile .genre-card {
    LOOP + AUDIO FILTER POPOVER
 ════════════════════════════════════════════════════════ */
 
-.loop-wrap {
+.loop-popover-wrap {
   position: relative;
 }
 
@@ -2843,9 +2843,13 @@ html.is-mobile .genre-card {
 
   .bp-guild-tag,
   .bp-vol,
-  #bp-loop,
   #bp-shuffle {
     display: none;
+  }
+
+  .loop-panel {
+    width: min(240px, calc(100vw - 24px));
+    right: -4px;
   }
 
   .app {
@@ -2903,7 +2907,6 @@ html.is-mobile .bp-track {
 
 html.is-mobile .bp-guild-tag,
 html.is-mobile .bp-vol,
-html.is-mobile #bp-loop,
 html.is-mobile #bp-shuffle {
   display: none;
 }

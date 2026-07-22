@@ -69,6 +69,10 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
         <span>History</span>
       </a>
+      <a class="nav-item" href="#" data-view="favorites">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <span>Favorites</span>
+      </a>
     </nav>
     <div class="sidebar-status">
       <div class="status-row">
@@ -108,9 +112,10 @@
         </div>
         <div class="discover-section hidden" id="suggestions-section">
           <h2 class="discover-title">
-            <span>Because you liked&hellip;</span>
+            <span>Because you favorited&hellip;</span>
           </h2>
           <div class="discover-list" id="suggestions-list"></div>
+          <button class="btn btn-ghost suggestions-see-all hidden" id="suggestions-see-all">See all suggested songs</button>
         </div>
         <div class="discover-section">
           <h2 class="discover-title">
@@ -148,6 +153,9 @@
 
       <!-- HISTORY VIEW -->
       <section id="view-history" class="view-section hidden"></section>
+
+      <!-- FAVORITES VIEW -->
+      <section id="view-favorites" class="view-section hidden"></section>
 
       <!-- ARTIST PROFILE VIEW -->
       <section id="view-artist" class="view-section hidden">
@@ -211,7 +219,7 @@
       </div>
       <div class="bp-right">
         <div class="bp-guild-tag" id="bp-guild">No guild</div>
-        <div class="loop-wrap">
+        <div class="loop-popover-wrap">
           <button class="bp-btn bp-loop" id="bp-loop" title="Loop &amp; Filters">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"></path><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><path d="M7 22l-4-4 4-4"></path><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
           </button>
