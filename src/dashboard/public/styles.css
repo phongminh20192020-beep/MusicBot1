@@ -2111,6 +2111,13 @@ html.is-mobile .genre-card {
   border: 1px solid var(--border);
 }
 
+@supports not (aspect-ratio: 16 / 10) {
+  .featured-card {
+    height: 0;
+    padding-top: 62.5%; /* 10/16 */
+  }
+}
+
 .featured-card:hover {
   transform: translateY(-6px) scale(1.03);
   box-shadow: 0 18px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08);
@@ -2179,6 +2186,8 @@ html.is-mobile .genre-card {
   border-radius: var(--radius-lg);
   cursor: pointer;
   border: 1px solid transparent;
+  min-width: 0;
+  height: fit-content;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease;
 }
 
@@ -2197,6 +2206,21 @@ html.is-mobile .genre-card {
   overflow: hidden;
   margin-bottom: 10px;
   background: var(--surface-3);
+}
+
+/* Universal fallback: browsers without aspect-ratio support (older
+   Safari/WebViews) would otherwise collapse this box to 0 height,
+   letting artwork of different intrinsic sizes stretch cards to
+   different heights -- the "one biggest, one smallest" card issue. */
+@supports not (aspect-ratio: 1 / 1) {
+  .discover-row .dr-art-wrap {
+    height: 0;
+    padding-top: 100%;
+  }
+  .discover-row .dr-art {
+    position: absolute;
+    inset: 0;
+  }
 }
 
 .discover-row .dr-art {
@@ -3143,6 +3167,8 @@ html.is-mobile .artists-grid {
   cursor: pointer;
   border: 1px solid transparent;
   text-align: center;
+  min-width: 0;
+  height: fit-content;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease;
   animation: cardIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   will-change: transform, opacity;
@@ -3176,6 +3202,17 @@ html.is-mobile .artists-grid {
   border-radius: 50%;
   overflow: hidden;
   background: var(--surface-3);
+}
+
+@supports not (aspect-ratio: 1 / 1) {
+  .artist-card .artist-avatar-wrap {
+    height: 0;
+    padding-top: 100%;
+  }
+  .artist-card .artist-avatar {
+    position: absolute;
+    inset: 0;
+  }
 }
 
 .artist-card .artist-avatar {
