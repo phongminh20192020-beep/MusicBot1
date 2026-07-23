@@ -303,7 +303,6 @@ function showLogin() {
   dashboard.classList.add("hidden");
   loginScreen.classList.remove("hidden", "leaving");
   loginCard.classList.remove("shake", "success");
-  if (loginCardFrame) loginCardFrame.style.transform = "";
   const btn = $("#login-btn");
   btn.classList.remove("success");
   btn.disabled = false;
@@ -323,38 +322,7 @@ function showDashboard() {
   loadDiscovery();
 }
 
-// ── Login screen flourishes: tilt, ripple, confetti ────
-if (loginCardFrame && window.matchMedia("(pointer: fine)").matches) {
-  loginCardFrame.style.transition = "transform .15s ease";
-  loginCardFrame.addEventListener("mousemove", e => {
-    const rect = loginCardFrame.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width - 0.5;
-    const py = (e.clientY - rect.top) / rect.height - 0.5;
-    loginCardFrame.style.transform = "perspective(900px) rotateY(" + (px * 7) + "deg) rotateX(" + (-py * 7) + "deg)";
-  });
-  loginCardFrame.addEventListener("mouseleave", () => {
-    loginCardFrame.style.transform = "";
-  });
-}
-
-function burstConfetti(x, y) {
-  const colors = ["#C79765", "#D6AC81", "#1db954", "#ffffff"];
-  for (let i = 0; i < 16; i++) {
-    const p = document.createElement("div");
-    p.className = "confetti-piece";
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 55 + Math.random() * 65;
-    p.style.setProperty("--tx", Math.cos(angle) * dist + "px");
-    p.style.setProperty("--ty", Math.sin(angle) * dist + "px");
-    p.style.setProperty("--rot", (Math.random() * 360) + "deg");
-    p.style.left = x + "px";
-    p.style.top = y + "px";
-    p.style.background = colors[i % colors.length];
-    document.body.appendChild(p);
-    setTimeout(() => p.remove(), 900);
-  }
-}
-
+// ── Login screen flourish: button ripple on click ──────
 $("#login-btn").addEventListener("click", e => {
   const btn = e.currentTarget;
   const rect = btn.getBoundingClientRect();
@@ -401,8 +369,6 @@ loginForm.addEventListener("submit", async e => {
     passwordInput.value = "";
     btn.classList.add("success");
     loginCard.classList.add("success");
-    const btnRect = btn.getBoundingClientRect();
-    burstConfetti(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2);
     await new Promise(r => setTimeout(r, 550));
     loginScreen.classList.add("leaving");
     await new Promise(r => setTimeout(r, 420));
