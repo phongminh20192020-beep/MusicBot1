@@ -1,0 +1,52 @@
+name: Defang
+run-name: Defang ${{ inputs.action || 'up' }} ${{ inputs.stack || 'production' }} ${{ inputs.correlation_id }}
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Whether to deploy up or down
+        required: true
+        default: up
+        type: choice
+        options:
+          - up
+          - down
+      stack:
+        description: The stack to deploy up or down. (Leave blank for default)
+        default: production
+      correlation_id:
+        description: Portal correlation ID (set automatically)
+        required: false
+        default: ""
+jobs:
+  defang:
+    name: Defang ${{ github.event.inputs.action || 'up' }} ${{ github.event.inputs.stack || 'production' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      cancel-in-progress: false
+      group: deploy-musicbot1-${{ github.event.inputs.stack || 'production' }}
+    environment: defang-${{ github.event.inputs.stack || 'production' }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+      - name: Defang ${{ github.event.inputs.action || 'up' }} ${{ github.event.inputs.stack || 'production' }}
+        uses: DefangLabs/defang-github-action@v2
+        with:
+          command: ${{ github.event.inputs.action || 'up' }}
+          project: musicbot1
+          stack: ${{ github.event.inputs.stack || 'production' }}
+          compose-files: compose.yaml
+      - name: Deployment Summary
+        uses: DefangLabs/defang-github-action@v2
+        with:
+          command: services
+          project: musicbot1
+          stack: ${{ github.event.inputs.stack || 'production' }}
+          compose-file: compose.yaml
