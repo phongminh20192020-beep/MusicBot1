@@ -7,7 +7,11 @@ const { spawn } = require("child_process");
 const mvStreamer = require("../stream/mvStreamer");
 
 const VIDEOS_DIR = process.env.MV_VIDEOS_DIR || "./videos";
-const YTDLP_COOKIES_PATH = process.env.MV_YTDLP_COOKIES_PATH || "";
+// Reuse the same cookies file Lavalink's YouTube plugin already uses
+// (lavalink/cookies.txt) unless a different path is explicitly configured --
+// otherwise yt-dlp has nothing and YouTube blocks the server as a bot.
+const DEFAULT_YTDLP_COOKIES_PATH = path.join(__dirname, "..", "..", "lavalink", "cookies.txt");
+const YTDLP_COOKIES_PATH = process.env.MV_YTDLP_COOKIES_PATH || DEFAULT_YTDLP_COOKIES_PATH;
 // No point downloading higher than this — prepareStream() re-encodes down to
 // MV_STREAM_HEIGHT anyway, so pulling a 4K/8K source just wastes minutes.
 const MAX_DOWNLOAD_HEIGHT = parseInt(process.env.MV_DOWNLOAD_MAX_HEIGHT || "1080", 10);
@@ -147,9 +151,12 @@ module.exports = {
         await interaction.editReply(`✅ Saved as \`${filename}\`. Use \`/mv play\` and pick it from the list.`);
       } catch (err) {
         console.error("[mv download] failed:", err.message);
-        const hint = /sign in to confirm/i.test(err.message)
-          ? "\n💡 YouTube is blocking this server's IP. Set `MV_YTDLP_COOKIES_PATH` to a cookies file (see bot owner)."
-          : "";
+        let hint = "";
+        if (/sign in to confirm/i.test(err.message)) {
+          hint = fs.existsSync(YTDLP_COOKIES_PATH)
+            ? `\n💡 Already using cookies from \`${YTDLP_COOKIES_PATH}\`, but YouTube rejected them anyway — they're likely expired/invalidated. Re-export a fresh cookies.txt and replace that file.`
+            : `\n💡 YouTube is blocking this server's IP and no cookies file was found at \`${YTDLP_COOKIES_PATH}\`. Add one there, or set \`MV_YTDLP_COOKIES_PATH\` to point elsewhere.`;
+        }
         await interaction.editReply(`❌ Download failed: ${err.message}${hint}`);
       }
       return;
