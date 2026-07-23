@@ -15,20 +15,47 @@ const YTDLP_COOKIES_PATH = process.env.MV_YTDLP_COOKIES_PATH || DEFAULT_YTDLP_CO
 // No point downloading higher than this — prepareStream() re-encodes down to
 // MV_STREAM_HEIGHT anyway, so pulling a 4K/8K source just wastes minutes.
 const MAX_DOWNLOAD_HEIGHT = parseInt(process.env.MV_DOWNLOAD_MAX_HEIGHT || "1080", 10);
+// One proxy URL per line (http/https/socks4/socks5), # comments and blank
+// lines ignored. See proxies.example.txt. Tried in order, after a direct
+// connection, whenever YouTube responds with a bot-block/rate-limit error.
+const PROXIES_PATH = process.env.MV_PROXIES_PATH || path.join(__dirname, "..", "..", "proxies.txt");
 
 function ensureVideosDir() {
   if (!fs.existsSync(VIDEOS_DIR)) fs.mkdirSync(VIDEOS_DIR, { recursive: true });
 }
 
+function loadProxies() {
+  try {
+    return fs.readFileSync(PROXIES_PATH, "utf8")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#"));
+  } catch {
+    return []; // file not present — direct connection only, same as before
+  }
+}
+
 const PROGRESS_LINE_RE = /\[download\]\s+([\d.]+)% of\s+~?([\d.]+\w+)(?:\s+at\s+([\d.]+\w+\/s|Unknown speed))?(?:\s+ETA\s+(\S+))?/;
+const BOT_BLOCK_RE = /sign in to confirm|confirm you.?re not a bot|http error 429|too many requests/i;
+
+/** Redacts credentials/host from a proxy URL for safe display in Discord messages. */
+function describeProxy(proxy) {
+  if (!proxy) return "direct connection";
+  try {
+    const u = new URL(proxy);
+    return `proxy (${u.protocol.replace(":", "")}://${u.hostname})`;
+  } catch {
+    return "proxy";
+  }
+}
 
 /**
- * Downloads a URL into VIDEOS_DIR using yt-dlp (handles YouTube and most
- * other video sites, plus plain direct file links). Returns the resulting
- * filename on success. Calls onProgress(text) as yt-dlp reports download
- * progress, so callers can surface live feedback instead of a silent wait.
+ * Runs a single yt-dlp attempt (optionally through one proxy). Resolves with
+ * the downloaded filename, or rejects with an Error. Bot-block/rate-limit
+ * failures get err.blocked = true so the caller knows retrying via a
+ * different proxy is worth it, versus a real/permanent failure.
  */
-function downloadVideo(url, customName, onProgress) {
+function runYtDlp(url, customName, proxy, onProgress) {
   return new Promise((resolve, reject) => {
     ensureVideosDir();
 
@@ -50,6 +77,7 @@ function downloadVideo(url, customName, onProgress) {
     if (YTDLP_COOKIES_PATH && fs.existsSync(YTDLP_COOKIES_PATH)) {
       args.push("--cookies", YTDLP_COOKIES_PATH);
     }
+    if (proxy) args.push("--proxy", proxy);
 
     const proc = spawn("yt-dlp", args);
 
@@ -79,12 +107,45 @@ function downloadVideo(url, customName, onProgress) {
     proc.on("error", (err) => reject(new Error(`yt-dlp not available: ${err.message}`)));
 
     proc.on("close", (code) => {
-      if (code !== 0) return reject(new Error(stderr.trim().split("\n").pop() || `yt-dlp exited with code ${code}`));
+      if (code !== 0) {
+        const message = stderr.trim().split("\n").pop() || `yt-dlp exited with code ${code}`;
+        const err = new Error(message);
+        if (BOT_BLOCK_RE.test(message)) err.blocked = true;
+        return reject(err);
+      }
       const filePath = stdout.trim().split("\n").pop();
       if (!filePath || !fs.existsSync(filePath)) return reject(new Error("Download finished but output file wasn't found."));
       resolve(path.basename(filePath));
     });
   });
+}
+
+/**
+ * Downloads a URL into VIDEOS_DIR using yt-dlp (handles YouTube and most
+ * other video sites, plus plain direct file links). Tries a direct
+ * connection first, then works through proxies.txt in order if YouTube
+ * responds with a bot-block/rate-limit error — a non-network failure (bad
+ * URL, unsupported site, etc.) fails fast without wasting time on proxies.
+ * Calls onProgress(text) throughout so callers can surface live feedback.
+ */
+async function downloadVideo(url, customName, onProgress) {
+  const proxies = loadProxies();
+  const attempts = [null, ...proxies]; // null = direct connection, tried first
+
+  let lastErr;
+  for (let i = 0; i < attempts.length; i++) {
+    const proxy = attempts[i];
+    if (i > 0 && onProgress) onProgress(`Blocked — retrying via ${describeProxy(proxy)} (${i}/${proxies.length})...`);
+    try {
+      return await runYtDlp(url, customName, proxy, onProgress);
+    } catch (err) {
+      lastErr = err;
+      if (!err.blocked) throw err; // real failure, not worth retrying with a proxy
+      // otherwise loop and try the next proxy
+    }
+  }
+  if (proxies.length) lastErr.message += ` (tried direct + ${proxies.length} prox${proxies.length === 1 ? "y" : "ies"}, all blocked)`;
+  throw lastErr;
 }
 
 module.exports = {
@@ -152,10 +213,15 @@ module.exports = {
       } catch (err) {
         console.error("[mv download] failed:", err.message);
         let hint = "";
-        if (/sign in to confirm/i.test(err.message)) {
-          hint = fs.existsSync(YTDLP_COOKIES_PATH)
-            ? `\n💡 Already using cookies from \`${YTDLP_COOKIES_PATH}\`, but YouTube rejected them anyway — they're likely expired/invalidated. Re-export a fresh cookies.txt and replace that file.`
-            : `\n💡 YouTube is blocking this server's IP and no cookies file was found at \`${YTDLP_COOKIES_PATH}\`. Add one there, or set \`MV_YTDLP_COOKIES_PATH\` to point elsewhere.`;
+        if (err.blocked || BOT_BLOCK_RE.test(err.message)) {
+          const proxyCount = loadProxies().length;
+          if (proxyCount > 0) {
+            hint = `\n💡 Direct connection and all ${proxyCount} prox${proxyCount === 1 ? "y" : "ies"} in \`proxies.txt\` got blocked. Cookies may also be stale — try re-exporting \`${YTDLP_COOKIES_PATH}\`, or add fresh proxies.`;
+          } else if (fs.existsSync(YTDLP_COOKIES_PATH)) {
+            hint = `\n💡 Already using cookies from \`${YTDLP_COOKIES_PATH}\`, but YouTube rejected them anyway — they're likely expired/invalidated. Re-export a fresh cookies.txt, or add a \`proxies.txt\` (see \`proxies.example.txt\`) so failed attempts retry through a different IP.`;
+          } else {
+            hint = `\n💡 YouTube is blocking this server's IP and no cookies file was found at \`${YTDLP_COOKIES_PATH}\`. Add one there, set \`MV_YTDLP_COOKIES_PATH\`, or add a \`proxies.txt\` (see \`proxies.example.txt\`) to retry through different IPs.`;
+          }
         }
         await interaction.editReply(`❌ Download failed: ${err.message}${hint}`);
       }

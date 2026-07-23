@@ -4,3 +4,4 @@ videos/
 tmp/
 *.log
 data/
+proxies.txt
