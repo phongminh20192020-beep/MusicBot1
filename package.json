@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node -r dotenv/config src/index.js",
     "start": "node -r dotenv/config src/index.js",
-    "register": "node -r dotenv/config src/register.js"
+    "register": "node -r dotenv/config src/register.js",
+    "refresh-proxies": "node -r dotenv/config scripts/refresh-proxies.js"
   },
   "dependencies": {
     "@dank074/discord-video-stream": "^5.0.2",

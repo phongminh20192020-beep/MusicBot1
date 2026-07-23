@@ -15,6 +15,13 @@ purgeExpired();
 // Bring up the MV self-bot streaming connection (no-op if STREAM_USER_TOKEN unset)
 mvStreamer.init().catch(err => console.error("[MVStream] init failed:", err.message));
 
+// Auto-pull + validate proxies from ProxyScrape on a schedule, so /mv download
+// always has fresh working IPs to fall back to when YouTube blocks us.
+// Opt-in: set PROXY_AUTO_REFRESH=true (see .env.example).
+if (process.env.PROXY_AUTO_REFRESH === "true") {
+  require("./utils/proxyRefresh").schedule();
+}
+
 // ─── Discord client ───────────────────────────────────────────────────────────
 const client = new Client({
   intents: [
