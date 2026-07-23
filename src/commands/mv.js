@@ -8,17 +8,23 @@ const mvStreamer = require("../stream/mvStreamer");
 
 const VIDEOS_DIR = process.env.MV_VIDEOS_DIR || "./videos";
 const YTDLP_COOKIES_PATH = process.env.MV_YTDLP_COOKIES_PATH || "";
+// No point downloading higher than this — prepareStream() re-encodes down to
+// MV_STREAM_HEIGHT anyway, so pulling a 4K/8K source just wastes minutes.
+const MAX_DOWNLOAD_HEIGHT = parseInt(process.env.MV_DOWNLOAD_MAX_HEIGHT || "1080", 10);
 
 function ensureVideosDir() {
   if (!fs.existsSync(VIDEOS_DIR)) fs.mkdirSync(VIDEOS_DIR, { recursive: true });
 }
 
+const PROGRESS_LINE_RE = /\[download\]\s+([\d.]+)% of\s+~?([\d.]+\w+)(?:\s+at\s+([\d.]+\w+\/s|Unknown speed))?(?:\s+ETA\s+(\S+))?/;
+
 /**
  * Downloads a URL into VIDEOS_DIR using yt-dlp (handles YouTube and most
  * other video sites, plus plain direct file links). Returns the resulting
- * filename on success.
+ * filename on success. Calls onProgress(text) as yt-dlp reports download
+ * progress, so callers can surface live feedback instead of a silent wait.
  */
-function downloadVideo(url, customName) {
+function downloadVideo(url, customName, onProgress) {
   return new Promise((resolve, reject) => {
     ensureVideosDir();
 
@@ -26,11 +32,13 @@ function downloadVideo(url, customName) {
       ? path.join(VIDEOS_DIR, `${customName}.%(ext)s`)
       : path.join(VIDEOS_DIR, "%(title)s.%(ext)s");
 
+    const heightFilter = `[height<=${MAX_DOWNLOAD_HEIGHT}]`;
     const args = [
       url,
       "-o", outputTemplate,
       "--no-playlist",
-      "-f", "mp4/bestvideo+bestaudio/best",
+      "--newline", // one progress line per update instead of \r-overwriting (needed since stdout isn't a TTY here)
+      "-f", `bv*${heightFilter}+ba/b${heightFilter}/best`,
       "--merge-output-format", "mp4",
       "--print", "after_move:filepath",
     ];
@@ -43,7 +51,25 @@ function downloadVideo(url, customName) {
 
     let stdout = "";
     let stderr = "";
-    proc.stdout.on("data", (d) => { stdout += d.toString(); });
+    let leftover = "";
+
+    proc.stdout.on("data", (d) => {
+      const chunk = d.toString();
+      stdout += chunk;
+
+      leftover += chunk;
+      const lines = leftover.split("\n");
+      leftover = lines.pop(); // keep any partial last line for the next chunk
+      for (const line of lines) {
+        const m = line.match(PROGRESS_LINE_RE);
+        if (m && onProgress) {
+          const [, pct, size, speed, eta] = m;
+          onProgress(`${pct}% of ${size}` + (speed ? ` at ${speed}` : "") + (eta ? ` (ETA ${eta})` : ""));
+        } else if (/\[Merger\]|Merging formats/.test(line) && onProgress) {
+          onProgress("Merging video + audio...");
+        }
+      }
+    });
     proc.stderr.on("data", (d) => { stderr += d.toString(); });
 
     proc.on("error", (err) => reject(new Error(`yt-dlp not available: ${err.message}`)));
@@ -108,8 +134,16 @@ module.exports = {
       await interaction.deferReply();
       await interaction.editReply(`⬇️ Downloading from \`${url}\`... this can take a bit for longer videos.`);
 
+      let lastEdit = 0;
+      const reportProgress = (text) => {
+        const now = Date.now();
+        if (now - lastEdit < 3000) return; // Discord webhook edits: stay well under the rate limit
+        lastEdit = now;
+        interaction.editReply(`⬇️ Downloading from \`${url}\`...\n${text}`).catch(() => {});
+      };
+
       try {
-        const filename = await downloadVideo(url, name);
+        const filename = await downloadVideo(url, name, reportProgress);
         await interaction.editReply(`✅ Saved as \`${filename}\`. Use \`/mv play\` and pick it from the list.`);
       } catch (err) {
         console.error("[mv download] failed:", err.message);
@@ -146,9 +180,11 @@ module.exports = {
     }
 
     await interaction.deferReply();
-    await interaction.editReply(`🎬 Starting **${filename}** in **${voiceChannel.name}**...`);
+    await interaction.editReply(`🎬 Preparing **${filename}**... joining **${voiceChannel.name}**.`);
 
-    mvStreamer.playMV(interaction.guildId, voiceChannel.id, filePath).catch((err) => {
+    mvStreamer.playMV(interaction.guildId, voiceChannel.id, filePath, () => {
+      interaction.editReply(`📡 Live in **${voiceChannel.name}** — playing **${filename}**.`).catch(() => {});
+    }).catch((err) => {
       console.error("[mv] playMV failed:", err.message);
       interaction.followUp(`⚠️ Streaming failed: ${err.message}`).catch(() => {});
     });

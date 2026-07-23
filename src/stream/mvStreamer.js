@@ -53,7 +53,7 @@ function isReady() {
   return ready;
 }
 
-async function playMV(guildId, voiceChannelId, filePath) {
+async function playMV(guildId, voiceChannelId, filePath, onStart) {
   if (!ready) throw new Error("MV streaming isn't set up (STREAM_USER_TOKEN missing or not logged in yet).");
   if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
 
@@ -74,6 +74,11 @@ async function playMV(guildId, voiceChannelId, filePath) {
   command.on("error", (err, stdout, stderr) => {
     console.error("[MVStream] ffmpeg error:", err.message);
   });
+
+  // Voice channel is joined and ffmpeg is spawned at this point -- this is
+  // as close as we get to "the stream is actually starting" versus the much
+  // later point where playback fully finishes, so let the caller know now.
+  if (onStart) onStart();
 
   // playStream resolves when playback finishes (or is stopped)
   const donePromise = playStream(output, streamer, { type: "go-live" })
