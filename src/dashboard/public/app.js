@@ -300,7 +300,15 @@ async function apiFetch(url, opts) {
 function showLogin() {
   if (socket) { socket.disconnect(); socket = null; }
   dashboard.classList.add("hidden");
-  loginScreen.classList.remove("hidden");
+  loginScreen.classList.remove("hidden", "leaving");
+  loginCard.classList.remove("shake", "success");
+  const btn = $("#login-btn");
+  btn.classList.remove("success");
+  btn.disabled = false;
+  const btnLabel = btn.querySelector(".login-btn-label");
+  if (btnLabel) btnLabel.textContent = "Sign in";
+  loginError.classList.remove("show");
+  loginError.textContent = "";
   passwordInput.focus();
 }
 
@@ -315,10 +323,13 @@ function showDashboard() {
 
 loginForm.addEventListener("submit", async e => {
   e.preventDefault();
+  loginError.classList.remove("show");
   loginError.textContent = "";
+  loginCard.classList.remove("shake", "success");
   const btn = $("#login-btn");
+  const btnLabel = btn.querySelector(".login-btn-label");
   btn.disabled = true;
-  btn.textContent = "Signing in...";
+  btnLabel.textContent = "Signing in...";
   try {
     const res = await fetch("/api/login", {
       method: "POST",
@@ -327,22 +338,37 @@ loginForm.addEventListener("submit", async e => {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      loginError.textContent = data.error || "Incorrect password.";
+      loginError.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="13"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><span>' + escapeHtml(data.error || "Incorrect password.") + '</span>';
+      loginError.classList.add("show");
       loginCard.classList.remove("shake");
       void loginCard.offsetWidth;
       loginCard.classList.add("shake");
       passwordInput.value = "";
+      passwordInput.focus();
       btn.disabled = false;
-      btn.textContent = "Sign in";
+      btnLabel.textContent = "Sign in";
       return;
     }
+    // Success: morph the button into a checkmark, pulse the card green,
+    // then fade the whole screen out before the dashboard mounts.
     passwordInput.value = "";
+    btn.classList.add("success");
+    loginCard.classList.add("success");
+    await new Promise(r => setTimeout(r, 550));
+    loginScreen.classList.add("leaving");
+    await new Promise(r => setTimeout(r, 420));
     showDashboard();
-  } catch (err) {
-    loginError.textContent = "Network error. Try again.";
-  } finally {
+    loginScreen.classList.remove("leaving");
+    btn.classList.remove("success");
+    loginCard.classList.remove("success");
     btn.disabled = false;
-    btn.textContent = "Sign in";
+    btnLabel.textContent = "Sign in";
+    return;
+  } catch (err) {
+    loginError.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="13"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><span>Network error. Try again.</span>';
+    loginError.classList.add("show");
+    btn.disabled = false;
+    btnLabel.textContent = "Sign in";
   }
 });
 
