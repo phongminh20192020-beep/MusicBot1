@@ -34,7 +34,6 @@ window.addEventListener("orientationchange", applyDeviceClass);
 const loginScreen   = $("#login-screen");
 const loginForm     = $("#login-form");
 const loginCard     = $(".login-card");
-const loginCardFrame = $(".login-card-frame");
 const loginError    = $("#login-error");
 const passwordInput = $("#password-input");
 const dashboard     = $("#dashboard");
@@ -321,20 +320,6 @@ function showDashboard() {
   loadFavorites().then(loadSuggestions);
   loadDiscovery();
 }
-
-// ── Login screen flourish: button ripple on click ──────
-$("#login-btn").addEventListener("click", e => {
-  const btn = e.currentTarget;
-  const rect = btn.getBoundingClientRect();
-  const size = Math.max(rect.width, rect.height);
-  const ripple = document.createElement("span");
-  ripple.className = "btn-ripple";
-  ripple.style.width = ripple.style.height = size + "px";
-  ripple.style.left = (e.clientX - rect.left - size / 2) + "px";
-  ripple.style.top = (e.clientY - rect.top - size / 2) + "px";
-  btn.appendChild(ripple);
-  setTimeout(() => ripple.remove(), 650);
-});
 
 loginForm.addEventListener("submit", async e => {
   e.preventDefault();

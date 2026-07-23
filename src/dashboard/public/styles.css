@@ -111,114 +111,20 @@ input {
 ════════════════════════════════════════════════════════ */
 
 .login-screen {
-  position: relative;
   height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--bg) 0%, #1a1a1e 100%);
   padding: 20px;
-  overflow: hidden;
-}
-
-.login-bg {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.login-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(70px);
-  opacity: 0.35;
-  will-change: transform;
-}
-
-.login-blob-1 {
-  width: 420px;
-  height: 420px;
-  top: -120px;
-  left: -100px;
-  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
-  animation: login-blob-float-1 16s ease-in-out infinite alternate;
-}
-
-.login-blob-2 {
-  width: 380px;
-  height: 380px;
-  bottom: -140px;
-  right: -80px;
-  background: radial-gradient(circle, #3d5a80 0%, transparent 70%);
-  animation: login-blob-float-2 20s ease-in-out infinite alternate;
-}
-
-@keyframes login-blob-float-1 {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(60px, 40px) scale(1.12); }
-}
-
-@keyframes login-blob-float-2 {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(-50px, -30px) scale(1.08); }
-}
-
-.login-grid {
-  position: absolute;
-  inset: -1px;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, #000 30%, transparent 90%);
-}
-
-.login-card-frame {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 380px;
-  border-radius: 18px;
-  padding: 1px;
-  will-change: transform;
-}
-
-.login-card-frame::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, var(--accent) 0%, transparent 40%, transparent 60%, var(--accent-h) 100%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0.55;
-  animation: beam-breathe 3.5s ease-in-out infinite;
-}
-
-@keyframes beam-breathe {
-  0%, 100% { opacity: 0.35; }
-  50%      { opacity: 0.75; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .login-blob,
-  .login-card-frame::before,
-  .login-title,
-  .login-logo-ring::before {
-    animation: none !important;
-  }
 }
 
 .login-card {
-  position: relative;
-  z-index: 1;
   width: 100%;
+  max-width: 380px;
   padding: 44px 40px;
-  background: rgba(20,20,23,0.92);
-  backdrop-filter: blur(20px);
+  background: var(--surface);
+  border: 1px solid var(--border-hi);
   border-radius: 16px;
   box-shadow: 0 32px 80px rgba(0,0,0,0.7);
   display: flex;
@@ -236,37 +142,14 @@ input {
 .login-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 28px;
   font-size: 16px;
   font-weight: 700;
 }
 
-.login-logo-ring {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  flex: none;
-  border-radius: 9px;
-}
-
-.login-logo-ring::before {
-  content: "";
-  position: absolute;
-  inset: -6px;
-  border-radius: 12px;
-  background: radial-gradient(circle, var(--accent-g) 0%, transparent 72%);
-  animation: login-logo-pulse 2.6s ease-in-out infinite;
-}
-
-@keyframes login-logo-pulse {
-  0%, 100% { opacity: 0.5; transform: scale(0.9); }
-  50%      { opacity: 1;   transform: scale(1.15); }
-}
-
 .login-logo svg,
 .login-logo img {
-  position: relative;
   width: 30px;
   height: 30px;
   border-radius: 8px;
@@ -279,18 +162,6 @@ input {
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-bottom: 6px;
-  background: linear-gradient(90deg, var(--text) 30%, var(--accent-h) 50%, var(--text) 70%);
-  background-size: 220% auto;
-  background-position: 0% center;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  animation: title-shimmer 7s ease-in-out infinite;
-}
-
-@keyframes title-shimmer {
-  to { background-position: -220% center; }
 }
 
 .login-sub {
@@ -446,35 +317,6 @@ input {
   position: relative;
   overflow: hidden;
   gap: 8px;
-}
-
-#login-btn .btn-ripple {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.45);
-  transform: scale(0);
-  animation: ripple-out .6s ease-out forwards;
-  pointer-events: none;
-}
-
-@keyframes ripple-out {
-  to { transform: scale(2.6); opacity: 0; }
-}
-
-#login-btn::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -60%;
-  width: 40%;
-  height: 100%;
-  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.35), transparent);
-  transform: skewX(-20deg);
-  transition: left .6s ease;
-}
-
-#login-btn:hover::before {
-  left: 130%;
 }
 
 #login-btn .login-btn-check {
@@ -1871,11 +1713,8 @@ input {
 }
 
 @media (max-width: 480px) {
-  .login-card-frame {
-    max-width: 100%;
-  }
-
   .login-card {
+    max-width: 100%;
     padding: 32px 20px;
   }
 
