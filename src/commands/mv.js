@@ -130,6 +130,9 @@ function runYtDlp(url, customName, proxy, onProgress) {
  */
 async function downloadVideo(url, customName, onProgress) {
   const proxies = loadProxies();
+  if (proxies.length === 0) {
+    console.log(`[mv download] No proxies loaded from ${PROXIES_PATH} — direct connection only. Run 'npm run refresh-proxies' or set PROXY_AUTO_REFRESH=true to populate it.`);
+  }
   const attempts = [null, ...proxies]; // null = direct connection, tried first
 
   let lastErr;
