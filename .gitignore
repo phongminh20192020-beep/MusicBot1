@@ -1,8 +1,6 @@
 node_modules/
 .env
-videos/
 tmp/
 *.log
 data/
-proxies.txt
 
