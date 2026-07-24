@@ -363,7 +363,7 @@ client.lavalink
         if (!player.get("autoplayAnnounced")) {
           player.set("autoplayAnnounced", true);
           const textChannel = client.channels.cache.get(textChannelId);
-          textChannel?.send("🎵 **Autoplay activated!** Now playing recommendations based on your music...").catch(() => {});
+          textChannel?.send("✨Autoplay activated!").catch(() => {});
         }
         return;
       } else {
