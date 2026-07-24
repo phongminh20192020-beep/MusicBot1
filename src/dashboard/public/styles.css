@@ -257,13 +257,13 @@ input {
 
 .login-card.success {
   animation: success-glow 1s ease;
-  border-color: rgba(29,185,84,0.5);
+  border-color: var(--accent-g);
 }
 
 @keyframes success-glow {
-  0%   { box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 0 rgba(29,185,84,0.5); transform: scale(1); }
-  40%  { box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 8px rgba(29,185,84,0.25); transform: scale(1.015); }
-  100% { box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 0 rgba(29,185,84,0); transform: scale(1); }
+  0%   { box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 0 rgba(199,151,101,0.5); transform: scale(1); }
+  40%  { box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 8px rgba(199,151,101,0.25); transform: scale(1.015); }
+  100% { box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 0 rgba(199,151,101,0); transform: scale(1); }
 }
 
 .login-screen.leaving {
@@ -334,7 +334,7 @@ input {
 }
 
 #login-btn.success {
-  background: var(--green);
+  background: var(--accent);
 }
 
 @keyframes login-check-pop {

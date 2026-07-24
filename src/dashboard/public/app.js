@@ -349,8 +349,8 @@ loginForm.addEventListener("submit", async e => {
       btnLabel.textContent = "Sign in";
       return;
     }
-    // Success: morph the button into a checkmark, pulse the card green,
-    // then fade the whole screen out before the dashboard mounts.
+    // Success: morph the button into a checkmark, pulse the card with the
+    // accent glow, then fade the whole screen out before the dashboard mounts.
     passwordInput.value = "";
     btn.classList.add("success");
     loginCard.classList.add("success");
