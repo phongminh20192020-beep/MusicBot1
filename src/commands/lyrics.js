@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const https = require("https");
+const { getLyrics, resolveArtistTitle } = require("../utils/lyrics");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -28,15 +28,12 @@ module.exports = {
       const player = client.lavalink.getPlayer(interaction.guildId);
       if (!player || !player.queue.current)
         return interaction.editReply("Nothing is playing and no query was provided.");
-      const track = player.queue.current;
-      title = track.info.title.replace(/\(.*?\)|\[.*?\]/g, "").trim();
-      artist = track.info.author.replace(/\s*-\s*Topic$/, "").trim();
+      ({ artist, title } = resolveArtistTitle(player.queue.current));
     }
 
-    let lyrics;
-    try {
-      lyrics = await fetchLyrics(artist, title);
-    } catch (err) {
+    const { plain, synced } = await getLyrics(artist, title);
+    const lyrics = plain || (synced ? synced.map((l) => l.text).join("\n") : null);
+    if (!lyrics) {
       return interaction.editReply(`Could not find lyrics for **${artist ? `${artist} — ` : ""}${title}**.`);
     }
 
@@ -75,41 +72,6 @@ module.exports = {
     }
   },
 };
-
-function fetchLyrics(artist, title) {
-  return new Promise((resolve, reject) => {
-    const slug = (str) => encodeURIComponent(str.replace(/[^\w\s'-]/gi, "").trim());
-    const path = artist
-      ? `/v1/${slug(artist)}/${slug(title)}`
-      : `/v1/unknown/${slug(title)}`;
-
-    const options = {
-      hostname: "api.lyrics.ovh",
-      path,
-      method: "GET",
-      headers: { "User-Agent": "DiscordMusicBot/1.0" },
-    };
-
-    const req = https.request(options, (res) => {
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => {
-        if (res.statusCode !== 200) return reject(new Error("Not found"));
-        try {
-          const json = JSON.parse(data);
-          if (json.lyrics) resolve(json.lyrics.trim());
-          else reject(new Error("No lyrics field"));
-        } catch {
-          reject(new Error("Parse error"));
-        }
-      });
-    });
-
-    req.on("error", reject);
-    req.setTimeout(8000, () => { req.destroy(); reject(new Error("Timeout")); });
-    req.end();
-  });
-}
 
 function splitLyrics(text, maxLen) {
   const chunks = [];

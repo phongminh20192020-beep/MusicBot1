@@ -59,6 +59,7 @@ const bpGuild       = $("#bp-guild");
 const bpPlaypause   = $("#bp-playpause");
 const bpVol         = $("#bp-vol");
 const bpLoop         = $("#bp-loop");
+const bpLyrics       = $("#bp-lyrics");
 const loopPanel       = $("#loop-panel");
 const loopOpts        = $("#loop-opts");
 const loopOptIndicator = $("#loop-opt-indicator");
@@ -70,6 +71,7 @@ const viewHome      = $("#view-home");
 const viewQueue     = $("#view-queue");
 const viewHistory   = $("#view-history");
 const viewFavorites = $("#view-favorites");
+const viewLyrics    = $("#view-lyrics");
 const genresScroll  = $("#genres-scroll");
 const artistsGrid    = $("#artists-grid");
 const artistsLoading = $("#artists-loading");
@@ -95,6 +97,8 @@ let socket = null;
 let currentPlayers = [];
 let activeGuildId = null;
 let currentView = "home";
+let lyricsState = null;     // { guildId, trackKey, synced, plain, lastPosition, lastPositionAt, paused, lastRenderedIndex }
+let lyricsSyncFrame = null; // requestAnimationFrame handle for the active highlight loop
 
 // Discover pagination state
 let discoverAllTracks = [];   // only used for local (search) pagination
@@ -395,6 +399,7 @@ navItems.forEach(item => {
 
 function switchView(view) {
   currentView = view;
+  bpLyrics.classList.toggle('active', view === 'lyrics');
   $$('.view-section').forEach(el => el.classList.add('hidden'));
   switch(view) {
     case 'queue':
@@ -408,6 +413,10 @@ function switchView(view) {
     case 'favorites':
       viewFavorites.classList.remove('hidden');
       renderFavoritesView();
+      break;
+    case 'lyrics':
+      viewLyrics.classList.remove('hidden');
+      renderLyricsView();
       break;
     default:
       viewHome.classList.remove('hidden');
@@ -920,6 +929,134 @@ async function renderFavoritesView() {
   }
 }
 
+// ── Lyrics View (time-synced) ────────────────────────
+function lyricsTrackKeyOf(player) {
+  const t = player && player.current;
+  return t ? `${player.guildId}:${t.uri || t.title}` : null;
+}
+
+async function renderLyricsView() {
+  if (!viewLyrics) return;
+  stopLyricsSync();
+
+  const player = currentPlayers.find(p => p.guildId === activeGuildId) || currentPlayers.find(p => p.current);
+  if (!player || !player.current) {
+    lyricsState = null;
+    viewLyrics.innerHTML =
+      '<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;">' +
+      '<div class="empty-icon"><svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><rect x="4" y="3" width="16" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"></rect></svg></div>' +
+      '<h3>Nothing playing</h3><p>Start a track with /play to see lyrics here.</p></div>';
+    return;
+  }
+
+  viewLyrics.innerHTML =
+    '<h2 class="discover-title" style="margin-bottom:4px;">Lyrics</h2>' +
+    '<p class="discover-sub" id="lyrics-subtitle" style="margin-bottom:20px;"></p>' +
+    '<div class="lyrics-panel" id="lyrics-panel"><div class="lyrics-loading">Loading lyrics&hellip;</div></div>';
+
+  $("#lyrics-subtitle").textContent = (player.current.author ? player.current.author + " — " : "") + player.current.title;
+
+  const key = lyricsTrackKeyOf(player);
+  lyricsState = {
+    guildId: player.guildId,
+    trackKey: key,
+    synced: null,
+    plain: null,
+    lastPosition: player.position || 0,
+    lastPositionAt: Date.now(),
+    paused: !!player.paused,
+    lastRenderedIndex: -1,
+  };
+
+  try {
+    const res = await apiFetch(`/api/players/${player.guildId}/lyrics`);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+
+    // Bail if the user switched tracks/views while this was in flight.
+    if (!lyricsState || lyricsState.trackKey !== key) return;
+
+    lyricsState.synced = data.synced;
+    lyricsState.plain = data.plain;
+    renderLyricsPanel();
+    if (data.synced && data.synced.length > 1) startLyricsSync();
+  } catch (e) {
+    const panel = $("#lyrics-panel");
+    if (panel) panel.innerHTML = '<div class="lyrics-empty">Could not load lyrics for this track.</div>';
+  }
+}
+
+function renderLyricsPanel() {
+  const panel = $("#lyrics-panel");
+  if (!panel || !lyricsState) return;
+
+  if (lyricsState.synced && lyricsState.synced.length > 1) {
+    panel.innerHTML = '<div class="lyrics-scroll" id="lyrics-scroll">' +
+      lyricsState.synced.map((l, i) =>
+        `<p class="lyrics-line" data-idx="${i}">${escapeHtml(l.text || "\u266a")}</p>`
+      ).join('') +
+      '</div>';
+    return;
+  }
+
+  if (lyricsState.plain) {
+    panel.innerHTML = '<div class="lyrics-plain">' + escapeHtml(lyricsState.plain).replace(/\n/g, '<br>') + '</div>' +
+      '<p class="lyrics-note">Live sync unavailable for this track — showing full lyrics.</p>';
+    return;
+  }
+
+  panel.innerHTML = '<div class="lyrics-empty">No lyrics found for this track.</div>';
+}
+
+/** Called on every ~1.5s socket "players" tick while the Lyrics view is open. */
+function updateLyricsPlayerState() {
+  if (!lyricsState) return;
+  const player = currentPlayers.find(p => p.guildId === lyricsState.guildId);
+  if (!player || !player.current) { renderLyricsView(); return; }
+
+  const key = lyricsTrackKeyOf(player);
+  if (key !== lyricsState.trackKey) { renderLyricsView(); return; } // track changed — refetch
+
+  lyricsState.lastPosition = player.position || 0;
+  lyricsState.lastPositionAt = Date.now();
+  lyricsState.paused = !!player.paused;
+}
+
+function startLyricsSync() {
+  stopLyricsSync();
+  const tick = () => {
+    if (!lyricsState || currentView !== 'lyrics') return;
+    const elapsed = lyricsState.paused ? 0 : Date.now() - lyricsState.lastPositionAt;
+    const position = lyricsState.lastPosition + elapsed;
+
+    const lines = lyricsState.synced;
+    let idx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].time <= position) idx = i; else break;
+    }
+
+    if (idx !== lyricsState.lastRenderedIndex) {
+      lyricsState.lastRenderedIndex = idx;
+      const scroll = $("#lyrics-scroll");
+      if (scroll) {
+        scroll.querySelectorAll('.lyrics-line.active').forEach(el => el.classList.remove('active'));
+        const activeEl = idx >= 0 ? scroll.querySelector(`.lyrics-line[data-idx="${idx}"]`) : null;
+        if (activeEl) {
+          activeEl.classList.add('active');
+          activeEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      }
+    }
+    lyricsSyncFrame = requestAnimationFrame(tick);
+  };
+  lyricsSyncFrame = requestAnimationFrame(tick);
+}
+
+function stopLyricsSync() {
+  if (lyricsSyncFrame) cancelAnimationFrame(lyricsSyncFrame);
+  lyricsSyncFrame = null;
+}
+
 // ── Socket ───────────────────────────────────────────
 function connectSocket() {
   if (socket) return;
@@ -962,6 +1099,7 @@ function renderPlayers(players) {
 
   if (currentView === 'queue') renderQueueView();
   if (currentView === 'history') renderHistoryView();
+  if (currentView === 'lyrics') updateLyricsPlayerState();
 }
 
 // ── Bottom Player ────────────────────────────────────
@@ -1032,6 +1170,12 @@ bpPlaypause.addEventListener('click', () => {
 $("#bp-next").addEventListener('click', () => sendCmd('skip'));
 $("#bp-prev").addEventListener('click', () => toast("Previous not implemented", {type:"error"}));
 $("#bp-shuffle").addEventListener('click', () => sendCmd('shuffle', {}).then(ok => { if (ok) toast("Queue shuffled"); }));
+bpLyrics.addEventListener('click', () => {
+  navItems.forEach(i => i.classList.remove('active'));
+  const lyricsNav = document.querySelector('.nav-item[data-view="lyrics"]');
+  if (lyricsNav) lyricsNav.classList.add('active');
+  switchView('lyrics');
+});
 
 // ── Loop mode + audio filter popover ─────────────────
 const FILTER_PRESETS = [

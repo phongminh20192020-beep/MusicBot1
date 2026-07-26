@@ -12,6 +12,7 @@ const { promisify } = require("util");
 const { COOKIE_NAME, createSession, destroySession, requireAuth, isValidFromHeader, parseCookies, isValid } = require("./auth");
 const { statsToJSON, playerToJSON } = require("./state");
 const { formatDuration, resolveSpotify, getSpotifyRecommendations, extractSpotifyId } = require("../utils/helpers");
+const { getLyrics, resolveArtistTitle } = require("../utils/lyrics");
 const { PENALTY_WORDS, TIER1_BONUS, TIER2_BONUS, TIER3_BONUS } = require("./public/keywords");
 
 const VALID_LOOP_MODES = new Set(["off", "track", "queue"]);
@@ -540,6 +541,31 @@ function startDashboard(client) {
     } catch (err) {
       console.error("[Dashboard] Search error:", err.message);
       res.status(500).json({ error: "Search failed." });
+    }
+  });
+
+  app.get("/api/players/:guildId/lyrics", requireAuth, async (req, res) => {
+    const player = getPlayerOr404(client, res, req.params.guildId);
+    if (!player) return;
+    const track = player.queue?.current;
+    if (!track) return res.status(404).json({ error: "Nothing is playing." });
+
+    const { artist, title } = resolveArtistTitle(track);
+    const durationSec = track.info.duration ? track.info.duration / 1000 : undefined;
+
+    try {
+      const { synced, plain, source } = await getLyrics(artist, title, durationSec);
+      res.json({
+        trackKey: track.info.identifier || track.info.uri || track.info.title,
+        artist,
+        title,
+        synced: synced || null, // [{time, text}] in ms, or null if unavailable
+        plain: plain || null,
+        source: source || null,
+      });
+    } catch (err) {
+      console.error("[Dashboard] Lyrics lookup error:", err.message);
+      res.status(500).json({ error: "Lyrics lookup failed." });
     }
   });
 
