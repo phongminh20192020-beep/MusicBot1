@@ -1,6 +1,6 @@
 "use strict";
 
-const { Client, GatewayIntentBits, Collection, EmbedBuilder } = require("discord.js");
+const { Client, GatewayIntentBits, Collection, EmbedBuilder, Options } = require("discord.js");
 const { LavalinkManager } = require("lavalink-client");
 const fs   = require("fs");
 const path = require("path");
@@ -13,12 +13,25 @@ const { startRamGuard } = require("./utils/ramGuard");
 purgeExpired();
 
 // ─── Discord client ───────────────────────────────────────────────────────────
+// This bot doesn't read message content, react, use threads, stage channels,
+// or presences -- discord.js caches all of those by default regardless, which
+// adds up fast on a 100MB plan. Capping/zeroing what's genuinely unused here
+// is the single biggest lever for staying under that limit.
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
   ],
+  makeCache: Options.cacheWithLimits({
+    MessageManager: 0,        // no message-content intent, nothing reads message history
+    ReactionManager: 0,       // reactions aren't used anywhere in this bot
+    ThreadManager: 0,         // no thread features
+    StageInstanceManager: 0,  // no stage-channel features
+    PresenceManager: 0,       // GuildPresences intent isn't even enabled
+    GuildMemberManager: 100,  // still needed for voice channel members, just capped per-guild instead of unbounded
+  }),
+  sweepers: Options.DefaultSweeperSettings, // periodic archived-thread sweep; harmless baseline, kept as-is
 });
 
 client.commands      = new Collection();
