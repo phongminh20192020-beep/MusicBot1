@@ -7,6 +7,7 @@ const path = require("path");
 const { formatDuration, progressBar, resolveSpotify, pickBestTrackMatch, getSpotifyRecommendations, extractSpotifyId, setVoiceStatus, clearVoiceStatus, setListeningPresence, resetPresence } = require("./utils/helpers");
 const { purgeExpired } = require("./utils/queueStore");
 const { startDashboard } = require("./dashboard/server");
+const { startRamGuard } = require("./utils/ramGuard");
 
 // Purge expired saved queues on startup
 purgeExpired();
@@ -470,6 +471,17 @@ client.on("interactionCreate", async interaction => {
 process.on("unhandledRejection",       reason => console.error("[Process] Unhandled Rejection:", reason));
 process.on("uncaughtException",        err    => console.error("[Process] Uncaught Exception:", err));
 process.on("uncaughtExceptionMonitor", err    => console.error("[Process] Uncaught Exception Monitor:", err));
+
+// Self-restarts before a hard host RAM limit kills the process mid-operation.
+// Reads MAX_RAM_MB or DISCLOUD_RAM_MB from env; no-ops if neither is set.
+// Pair with AUTORESTART=true in discloud.config (or any process manager that
+// restarts on crash) so the process actually comes back up after this exits.
+startRamGuard({
+  onBeforeExit: async () => {
+    console.log("[RamGuard] Logging out of Discord before restart...");
+    await client.destroy().catch(() => {});
+  },
+});
 
 // ─── Web dashboard ────────────────────────────────────────────────────────────
 // Purely additive: reads existing client/lavalink state and calls existing

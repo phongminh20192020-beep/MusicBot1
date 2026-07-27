@@ -1,0 +1,21 @@
+# Discloud runs `npm install` itself from package.json — don't upload node_modules
+node_modules/
+
+# Runtime data, not source — none of this should ship in the deploy zip
+videos/
+tmp/
+data/
+*.log
+proxies.txt
+
+# The lavalink/ folder is a separate Java service (its own Dockerfile), not
+# part of this Node app — deploy it separately (see README for options).
+lavalink/
+
+# Local dev / git internals
+.git/
+.github/
+.env
+.gitignore
+.discloudignore
+README.md
