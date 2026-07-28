@@ -7,8 +7,13 @@ when you create the server).
 ## 1. Create the bot's server
 
 - Project type: **Discord Bot**
-- Docker image: **Node.js** (Wispbyte also offers Bun/Python/Java/C# — pick
-  Node.js since that's what this project is)
+- Docker image: **Node.js** — if Wispbyte lets you pick a specific version
+  tag, choose **Node 22** or newer. This matters: `discord.js@14.16.3`
+  requires **Node.js 22.12.0+** per its own docs (a much higher bar than
+  older discord.js versions needed — a generic "Node.js" image defaulting
+  to 18 or 20 will fail or behave unpredictably). `package.json` now
+  declares this via `"engines": { "node": ">=22.12.0" }`, so check the
+  logs for an engine-mismatch warning if the bot won't start.
 - When prompted for the main startup file via the console file picker,
   choose: `src/index.js`
 
