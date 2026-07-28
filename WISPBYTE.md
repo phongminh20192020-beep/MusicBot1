@@ -7,13 +7,13 @@ when you create the server).
 ## 1. Create the bot's server
 
 - Project type: **Discord Bot**
-- Docker image: **Node.js** — if Wispbyte lets you pick a specific version
-  tag, choose **Node 22** or newer. This matters: `discord.js@14.16.3`
-  requires **Node.js 22.12.0+** per its own docs (a much higher bar than
-  older discord.js versions needed — a generic "Node.js" image defaulting
-  to 18 or 20 will fail or behave unpredictably). `package.json` now
-  declares this via `"engines": { "node": ">=22.12.0" }`, so check the
-  logs for an engine-mismatch warning if the bot won't start.
+- Docker image: **Node.js** — any Node **18 or newer** works
+  (`package.json` declares `"engines": { "node": ">=18.0.0" }`, matching
+  what discord.js/lavalink-client actually require). Note: discord.js's
+  own docs site displays a much higher "Node 22.12.0+" banner on every
+  version's page regardless of which version you're actually looking at —
+  that's misleading; the real published requirement for the installed
+  version is 18+, confirmed against the npm registry directly.
 - When prompted for the main startup file via the console file picker,
   choose: `src/index.js`
 
